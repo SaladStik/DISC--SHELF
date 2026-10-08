@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DISC//SHELF</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="flash"></div>
+
+    <section id="start" class="screen">
+      <div class="haze"></div>
+      <div class="start-inner">
+        <div class="logo">DISC<span>//</span>SHELF</div>
+        <div class="tag">your spotify library as a wall of jewel cases</div>
+        <div class="menu">
+          <label class="field" id="cid-field">
+            <span>SPOTIFY CLIENT ID</span>
+            <input id="cid" spellcheck="false" autocomplete="off" placeholder="paste from developer.spotify.com" />
+          </label>
+          <button id="btn-connect" class="btn primary">▶ CONNECT SPOTIFY</button>
+          <button id="btn-demo" class="btn">◇ DEMO MODE</button>
+        </div>
+        <details class="help">
+          <summary>SETUP (60 SECONDS)</summary>
+          <ol>
+            <li>Create an app at <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">developer.spotify.com/dashboard</a></li>
+            <li>Add redirect URI <code id="redir"></code></li>
+            <li>Tick <b>Web API</b> + <b>Web Playback SDK</b>, then paste the Client ID above</li>
+            <li>Playback in the browser needs Spotify Premium</li>
+          </ol>
+        </details>
+        <div class="start-err" id="start-err"></div>
+      </div>
+    </section>
+
+    <section id="hud" hidden>
+      <header class="top">
+        <div class="brand">DISC<span>//</span>SHELF</div>
+        <nav class="crumbs">
+          <button id="crumb-root" class="crumb">PLAYLISTS</button>
+          <span id="crumb-sep" class="sep" hidden>›</span>
+          <span id="crumb-pl" class="crumb current"></span>
+        </nav>
+        <div class="top-right">
+          <div id="media-seg" class="seg" title="Media (M)">
+            <button data-m="cd">CD</button><button data-m="vinyl">VINYL</button><button data-m="tape">TAPE</button>
+          </div>
+          <button id="btn-bass" class="chip" title="Bass source (B): auto beat or mic sync">♪ AUTO BEAT</button>
+          <div class="theme-wrap">
+            <button id="btn-theme" class="chip theme-chip" title="Room theme (T)"></button>
+            <div id="theme-menu" class="theme-menu" hidden></div>
+          </div>
+          <button id="btn-search" class="chip" title="Search (/ or ⌘K)">⌕ SEARCH</button>
+          <button id="btn-queue" class="chip" title="Queue (L)">≡ QUEUE <b id="q-count">0</b></button>
+          <button id="btn-view" class="chip" title="Jukebox (J)">◉ JUKEBOX</button>
+          <span id="user" class="user"></span>
+        </div>
+      </header>
+
+      <div id="hover-card" class="hover-card">
+        <div class="hc-kicker" id="hc-kicker"></div>
+        <div class="hc-title" id="hc-title"></div>
+        <div class="hc-sub" id="hc-sub"></div>
+        <div class="hc-keys" id="hc-keys"></div>
+      </div>
+
+      <div id="loading" class="loading" hidden>
+        <div class="disc-spin"></div>
+        <div id="loading-text">READING DISC…</div>
+        <div class="bar"><i id="loading-bar"></i></div>
+      </div>
+
+      <div class="scrub-wrap">
+        <input id="scrub" type="range" min="0" max="1000" value="0" />
+      </div>
+
+      <aside id="queue" class="queue" hidden>
+        <header class="q-head">
+          <div class="q-title">QUEUE</div>
+          <div class="q-actions">
+            <button id="q-shuffle" class="chip" title="Shuffle what's up next">⤮ SHUFFLE</button>
+            <button id="q-clear" class="chip" title="Clear up next">CLEAR</button>
+            <button id="q-close" class="chip" title="Close (L)">✕</button>
+          </div>
+        </header>
+        <div id="q-now" class="q-now"></div>
+        <div class="q-sub">UP NEXT <span id="q-upcount"></span></div>
+        <ol id="q-list" class="q-list"></ol>
+      </aside>
+
+      <div id="pills" class="pills"></div>
+
+      <footer class="player">
+        <img id="np-art" class="np-art" alt="" />
+        <div class="np-meta">
+          <div id="np-title" class="np-title">NO DISC</div>
+          <div id="np-artist" class="np-artist">pick something off the shelf</div>
+        </div>
+        <div class="controls">
+          <button id="btn-prev" class="ctl" title="Previous (P)">⏮</button>
+          <button id="btn-play" class="ctl big" title="Play / pause (Space)">▶</button>
+          <button id="btn-next" class="ctl" title="Next (N)">⏭</button>
+          <button id="btn-shuffle" class="ctl" title="Shuffle: robot picks a random disc (S)">⤮</button>
+        </div>
+        <div class="progress">
+          <span id="t-cur">0:00</span>
+          <div class="track"><i id="t-bar"></i></div>
+          <span id="t-dur">0:00</span>
+        </div>
+        <label class="vol" title="Volume">
+          <span>VOL</span>
+          <input id="vol" type="range" min="0" max="100" value="60" />
+        </label>
+      </footer>
+    </section>
+
+    <div id="search" class="search" hidden>
+      <div class="s-box">
+        <div class="s-bar">
+          <span class="s-icon">⌕</span>
+          <input id="search-input" spellcheck="false" autocomplete="off" />
+          <span id="search-meta" class="s-count"></span>
+        </div>
+        <ul id="search-results" class="s-results"></ul>
+        <div class="s-foot"><span><kbd>↑↓</kbd>browse the shelf</span><span><kbd>ENTER</kbd>play</span><span><kbd>SHIFT+ENTER</kbd>queue</span><span><kbd>ESC</kbd>close</span></div>
+      </div>
+    </div>
+    <div id="ctx" class="ctx" hidden></div>
+    <div id="toast" class="toast"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
