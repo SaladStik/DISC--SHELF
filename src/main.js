@@ -196,6 +196,7 @@ async function openPlaylist(pl) {
   try {
     let tracks;
     if (S.demo) tracks = demoTracks(pl);
+    else if (S.snapshot) tracks = S.snapshot.tracks[pl.id] || [];
     else {
       loading('READING BINDER…', 0);
       tracks = await sp.getPlaylistTracks(pl, (n, total) => loading(`READING BINDER… ${n}/${total}`, total ? n / total : 0));
@@ -400,6 +401,7 @@ function queueTrack(i, next = false) {
 
 async function loadTracksFor(pl) {
   if (S.demo) return demoTracks(pl);
+  if (S.snapshot) return S.snapshot.tracks[pl.id] || [];
   loading('READING BINDER…', 0);
   try {
     return await sp.getPlaylistTracks(pl, (n, total) => loading(`READING BINDER… ${n}/${total}`, total ? n / total : 0));
@@ -677,6 +679,17 @@ async function startDemo() {
   enter();
 }
 
+/** Pitch: run on a saved library. With a live login in this browser, it plays for real. */
+async function startSnapshot(lib) {
+  S.snapshot = lib;
+  S.liveAudio = !!localStorage.getItem('ds.token') && !!sp.getClientId();
+  bindPlayer(S.liveAudio ? new sp.SpotifyPlayer() : new DemoPlayer({ silent: true }));
+  if (S.liveAudio) S.player.ready.catch(() => {});
+  S.playlists = lib.playlists;
+  $('user').textContent = lib.user?.name || '';
+  enter();
+}
+
 async function startSpotify() {
   loading('CONNECTING…', 0.2);
   try {
@@ -690,10 +703,12 @@ async function startSpotify() {
     enter();
   } catch (e) {
     loading(null);
-    sp.logout();
+    // only a dead login signs you out; rate limits and network blips just ask you to retry
+    const dead = e.authInvalid || e.status === 401;
+    if (dead) sp.logout();
     $('start').hidden = false;
     $('hud').hidden = true;
-    $('start-err').textContent = e.message;
+    $('start-err').textContent = dead ? 'Your Spotify login expired. Connect again.' : `Spotify didn’t answer (${e.message}). Try again in a minute.`;
   }
 }
 
@@ -717,7 +732,7 @@ initSearch({
     // frame the match right of center so the docked search panel doesn't cover it
     S.scrollTarget = clampScroll(shelf.xOfIndex(i) - (innerWidth > 900 ? halfWidth() * 0.32 : 0));
   },
-  searchRemote: (q) => (S.demo ? Promise.resolve([]) : sp.searchTracks(q)),
+  searchRemote: (q) => (S.demo || (S.snapshot && !S.liveAudio) ? Promise.resolve([]) : sp.searchTracks(q)),
   onChoose: (r, act) => {
     S.player?.unlock();
     const t = r.item;
@@ -801,6 +816,7 @@ $('btn-connect').onclick = async () => {
 };
 
 (async () => {
+  if (window.DS_PITCH) return; // the pitch page boots the app itself
   if (new URLSearchParams(location.search).has('demo')) return startDemo();
   try {
     if (await sp.handleRedirect()) {
@@ -929,4 +945,15 @@ function frame() {
 }
 requestAnimationFrame(frame);
 
-if (import.meta.env.DEV) window.__ds = { S, shelf, juke, openPlaylist, robotPlay };
+
+/** Handles for the pitch director (and rehearsals in the console). */
+export const app = {
+  S, shelf, juke, arm, camera, retro, Beat, THEMES,
+  openPlaylist, showPlaylists, robotPlay, setView, setMedia, queueTrack, pill, flash, clampScroll, halfWidth,
+  setTheme: (id) => setTheme(Math.max(0, THEMES.findIndex((t) => t.id === id))),
+  get themeId() {
+    return THEMES[themeIdx].id;
+  },
+  toggleQueue, openSearch, closeSearch, searchOpen, startSnapshot, startDemo,
+};
+if (import.meta.env.DEV) window.__ds = app;

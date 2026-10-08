@@ -72,7 +72,11 @@ async function tokenRequest(body) {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ client_id: getClientId(), ...body }),
   });
-  if (!res.ok) throw new Error(`Token request failed (${res.status})`);
+  if (!res.ok) {
+    const e = new Error(`Token request failed (${res.status})`);
+    e.authInvalid = res.status === 400 || res.status === 401; // revoked / expired refresh token
+    throw e;
+  }
   const data = await res.json();
   const prev = load(LS.token, true) || {};
   const token = {

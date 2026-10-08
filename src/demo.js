@@ -49,7 +49,8 @@ export function demoTracks(playlist) {
 }
 
 export class DemoPlayer {
-  constructor() {
+  constructor({ silent = false } = {}) {
+    this.silent = silent;
     this.listeners = new Set();
     this.tracks = [];
     this.order = [];
@@ -137,7 +138,7 @@ export class DemoPlayer {
   // A seeded little arpeggio so the demo jukebox actually makes noise.
   startSynth() {
     this.stopSynth();
-    if (!this.ctx || !this.track) return;
+    if (this.silent || !this.ctx || !this.track) return;
     const r = rand(hash(this.track.id));
     const root = 110 * Math.pow(2, Math.floor(r() * 12) / 12);
     const scale = [0, 3, 5, 7, 10, 12, 15, 17];
