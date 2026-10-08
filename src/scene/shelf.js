@@ -10,7 +10,7 @@ export const BASE_Y = 0.35;
 export const KINDS = {
   cd: { W: 1.42, H: 1.25, D: 0.13, gap: 0.012, spine: [48, 384], draw: drawCdSpine, media: 'cd', grip: 0.5, slide: 'x' },
   vinyl: { W: 1.42, H: 1.42, D: 0.07, gap: 0.008, spine: [32, 384], draw: drawCdSpine, media: 'vinyl', grip: 0.56, slide: 'x' },
-  tape: { W: 1.2, H: 0.78, D: 0.2, gap: 0.016, spine: [64, 256], draw: drawCdSpine, media: 'tape', grip: 0.26, slide: 'y' },
+  tape: { W: 1.2, H: 0.78, D: 0.2, gap: 0.016, spine: [64, 256], draw: drawCdSpine, media: 'tape', grip: 0.26, slide: 'y', rows: 4, rowH: 1.08 },
   binder: { W: 1.3, H: 1.42, D: 0.36, gap: 0.03, spine: [96, 384], draw: drawBinderSpine, media: 'cd', grip: 0.5, slide: 'x' },
 };
 
@@ -155,6 +155,8 @@ class Case {
 export class Shelf {
   constructor(scene) {
     this.scene = scene;
+    this.rows = ROWS;
+    this.rowH = ROW_H;
     this.group = new THREE.Group();
     scene.add(this.group);
     this.items = [];
@@ -196,8 +198,10 @@ export class Shelf {
     this.kind = kind;
     this.built = performance.now();
     const k = (this.k = KINDS[kind]);
+    this.rows = k.rows || ROWS;
+    this.rowH = k.rowH || ROW_H;
     const slot = k.D + k.gap;
-    const perRow = (this.perRow = Math.max(4, Math.ceil(items.length / ROWS)));
+    const perRow = (this.perRow = Math.max(4, Math.ceil(items.length / this.rows)));
     const bay = 30; // slots per bookcase bay, with a divider between bays
     this.xOf = (col) => col * slot + Math.floor(col / bay) * 0.12;
     this.length = this.xOf(perRow - 1) + slot + 0.6;
@@ -211,35 +215,35 @@ export class Shelf {
     const darkWood = new THREE.MeshLambertMaterial({ color: 0x2a160c });
     const ledMat = new THREE.MeshBasicMaterial({ color: 0xffd9a0 });
     const W = this.length + 0.3;
-    for (let r = 0; r <= ROWS; r++) {
+    for (let r = 0; r <= this.rows; r++) {
       const plank = new THREE.Mesh(new THREE.BoxGeometry(W, 0.08, 1.75), woodMat);
-      plank.position.set(this.length / 2, BASE_Y + r * ROW_H, -0.05);
+      plank.position.set(this.length / 2, BASE_Y + r * this.rowH, -0.05);
       F.add(plank);
       if (r > 0) {
         const led = new THREE.Mesh(new THREE.BoxGeometry(W, 0.015, 0.02), ledMat);
-        led.position.set(this.length / 2, BASE_Y + r * ROW_H - 0.05, 0.78);
+        led.position.set(this.length / 2, BASE_Y + r * this.rowH - 0.05, 0.78);
         F.add(led);
       }
     }
-    const back = new THREE.Mesh(new THREE.BoxGeometry(W, ROWS * ROW_H + 0.08, 0.06), darkWood);
-    back.position.set(this.length / 2, BASE_Y + (ROWS * ROW_H) / 2, -0.9);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(W, this.rows * this.rowH + 0.08, 0.06), darkWood);
+    back.position.set(this.length / 2, BASE_Y + (this.rows * this.rowH) / 2, -0.9);
     F.add(back);
-    const sideGeo = new THREE.BoxGeometry(0.1, ROWS * ROW_H + 0.08, 1.8);
+    const sideGeo = new THREE.BoxGeometry(0.1, this.rows * this.rowH + 0.08, 1.8);
     const addSide = (x) => {
       const s = new THREE.Mesh(sideGeo, woodMat);
-      s.position.set(x, BASE_Y + (ROWS * ROW_H) / 2, -0.05);
+      s.position.set(x, BASE_Y + (this.rows * this.rowH) / 2, -0.05);
       F.add(s);
     };
     addSide(0.15);
     addSide(this.length + 0.15);
     for (let col = bay; col < perRow; col += bay) addSide(0.3 + this.xOf(col) - 0.08);
-    F.add(this.label(kind === 'cd' ? `${items.length} DISCS` : 'PLAYLISTS', 0.6, BASE_Y + ROWS * ROW_H + 0.12));
+    F.add(this.label(kind === 'binder' ? 'PLAYLISTS' : `${items.length} ${{ cd: 'DISCS', vinyl: 'RECORDS', tape: 'TAPES' }[kind]}`, 0.6, BASE_Y + this.rows * this.rowH + 0.12));
   }
 
   homeOf(i) {
     const row = Math.floor(i / this.perRow);
     const col = i % this.perRow;
-    return { row, col, pos: new THREE.Vector3(0.3 + this.xOf(col) + this.k.D / 2, BASE_Y + (ROWS - 1 - row) * ROW_H + this.k.H / 2 + 0.04, 0) };
+    return { row, col, pos: new THREE.Vector3(0.3 + this.xOf(col) + this.k.D / 2, BASE_Y + (this.rows - 1 - row) * this.rowH + this.k.H / 2 + 0.04, 0) };
   }
 
   xOfIndex(i) {
@@ -256,7 +260,7 @@ export class Shelf {
         this.live.delete(i);
       }
     }
-    for (let row = 0; row < ROWS; row++) {
+    for (let row = 0; row < this.rows; row++) {
       for (let col = 0; col < this.perRow; col++) {
         const x = 0.3 + this.xOf(col);
         if (x < x0 || x > x1) continue;
@@ -351,9 +355,9 @@ export class Shelf {
   /** Item whose shelf slot contains world point (x, y). Ignores where popped cases currently are. */
   indexAt(x, y) {
     if (!this.items.length) return -1;
-    const rowFromBottom = Math.floor((y - BASE_Y) / ROW_H);
-    const row = ROWS - 1 - rowFromBottom;
-    if (row < 0 || row >= ROWS) return -1;
+    const rowFromBottom = Math.floor((y - BASE_Y) / this.rowH);
+    const row = this.rows - 1 - rowFromBottom;
+    if (row < 0 || row >= this.rows) return -1;
     const slot = this.k.D + this.k.gap;
     let lo = 0,
       hi = this.perRow - 1;

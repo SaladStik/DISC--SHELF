@@ -152,6 +152,7 @@ export class Turntable {
     this.recordIn = 0;
     this.scroll = 0;
     this.insertY = 0.62;
+    this.viewDist = 5.4;
   }
   get slotWorld() {
     return this.group.localToWorld(new THREE.Vector3(-0.22, 1.4, 0));
@@ -306,6 +307,7 @@ export class Boombox {
     this.speed = 0;
     this.scroll = 0;
     this.insertY = -0.2;
+    this.viewDist = 5.9;
   }
   get slotWorld() {
     return this.group.localToWorld(new THREE.Vector3(0, 2.24, -0.12));
@@ -417,6 +419,13 @@ export class Station {
   }
   get viewTarget() {
     return this.active.viewTarget;
+  }
+  get viewDist() {
+    return this.active.viewDist ?? 7.3;
+  }
+  /** Half-width that must stay on screen (portrait phones back the camera off to fit it). */
+  get viewHalfW() {
+    return { cd: 1.7, vinyl: 2.35, tape: 1.95 }[this.mode];
   }
   get insertY() {
     return this.active.insertY ?? -0.15;

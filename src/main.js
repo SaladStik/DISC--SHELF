@@ -64,6 +64,7 @@ function renderThemeMenu() {
 function resize() {
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
+  camera.fov = camera.aspect < 1 ? 42 + (1 - camera.aspect) * 36 : 42;
   camera.updateProjectionMatrix();
   retro.setSize(innerWidth, innerHeight);
 }
@@ -99,7 +100,11 @@ const camPos = new THREE.Vector3(2, 4.5, 9);
 const camLook = new THREE.Vector3(2, 2.6, 0);
 camera.position.copy(camPos);
 
-const halfWidth = () => 7.5 * Math.tan(THREE.MathUtils.degToRad(21)) * camera.aspect;
+// portrait phones get a wider lens (backing the camera up would put it inside the jukebox set)
+const tanHalfFov = () => Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+const shelfDist = () => 7.5;
+const jukeDist = () => Math.min(9.5, Math.max(juke.viewDist, juke.viewHalfW / (tanHalfFov() * camera.aspect)));
+const halfWidth = () => shelfDist() * tanHalfFov() * camera.aspect;
 const clampScroll = (x) => {
   const hw = Math.min(halfWidth() * 0.7, shelf.length / 2);
   return THREE.MathUtils.clamp(x, hw, Math.max(hw, shelf.length - hw));
@@ -142,6 +147,7 @@ function setCrumbs() {
 }
 
 function hoverCard(item) {
+  const coarse = S.lastPointer ? S.lastPointer !== 'mouse' : matchMedia('(pointer: coarse)').matches;
   const card = $('hover-card');
   if (!item || S.view !== 'shelf') {
     card.classList.add('hidden');
@@ -149,14 +155,14 @@ function hoverCard(item) {
   }
   card.classList.remove('hidden');
   if (S.mode === 'playlists') {
-    $('hc-kicker').textContent = item.locked ? '🔒 NOT YOURS · PLAYS AS A WHOLE' : 'PLAYLIST BINDER';
+    $('hc-kicker').textContent = (item.locked ? '🔒 NOT YOURS · PLAYS AS A WHOLE' : 'PLAYLIST BINDER') + (coarse ? ' · TAP AGAIN TO OPEN' : '');
     $('hc-title').textContent = item.name;
     $('hc-sub').textContent = `${item.total != null ? `${item.total} tracks · ` : ''}${item.owner || ''}`;
     $('hc-keys').innerHTML = '<span><kbd>CLICK</kbd>open</span><span><kbd>S</kbd>shuffle play</span><span><kbd>Q</kbd>queue all</span><span><kbd>RIGHT-CLICK</kbd>more</span>';
   } else {
     const i = shelf.hovered;
     const now = S.queue?.current?.id === item.id;
-    $('hc-kicker').textContent = now ? '▶ NOW PLAYING' : `TRACK ${String(i + 1).padStart(3, '0')} / ${S.tracks.length}`;
+    $('hc-kicker').textContent = (now ? '▶ NOW PLAYING' : `TRACK ${String(i + 1).padStart(3, '0')} / ${S.tracks.length}`) + (coarse && !now ? ' · TAP AGAIN TO PLAY' : '');
     $('hc-title').textContent = item.name;
     $('hc-sub').textContent = `${item.artists} — ${item.album}`;
     $('hc-keys').innerHTML =
@@ -201,8 +207,7 @@ async function openPlaylist(pl) {
     }
     S.tracks = tracks;
     S.mode = 'tracks';
-    setTheme(themeIdx);
-setMedia(S.media); // re-dress the room with this playlist's covers
+    setTheme(themeIdx); // re-dress the room with this playlist's covers
     if (searchOpen()) closeSearch();
     flash(0.6);
     shelf.build(tracks, S.media);
@@ -475,7 +480,7 @@ canvasEl.addEventListener('pointermove', (e) => {
   S.keyboard = false;
   if (drag) {
     const dx = e.clientX - drag.x;
-    if (Math.abs(dx) > 6) drag.moved = true;
+    if (Math.abs(dx) > (drag.touch ? 10 : 6)) drag.moved = true;
     S.scrollTarget = clampScroll(drag.scroll - dx * 0.012);
   }
 });
@@ -486,7 +491,12 @@ canvasEl.addEventListener('pointerdown', (e) => {
     return;
   }
   if (e.button !== 0) return;
-  drag = { x: e.clientX, scroll: S.scrollTarget, moved: false };
+  S.lastPointer = e.pointerType;
+  if (e.pointerType !== 'mouse') {
+    S.mouse.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+    S.mouseInside = true;
+  }
+  drag = { x: e.clientX, scroll: S.scrollTarget, moved: false, touch: e.pointerType !== 'mouse' };
 });
 canvasEl.addEventListener('contextmenu', (e) => {
   e.preventDefault();
@@ -494,7 +504,18 @@ canvasEl.addEventListener('contextmenu', (e) => {
   if (i >= 0) contextMenu(e.clientX, e.clientY, i);
 });
 addEventListener('pointerup', () => {
-  if (drag && !drag.moved && S.view === 'shelf') activate(pick());
+  if (drag?.touch && !drag.moved && S.view === 'shelf') {
+    const i = pick();
+    S.mouseInside = false; // fingers don't hover
+    if (i >= 0 && i !== S.touchSel) {
+      S.touchSel = i;
+      S.keyboard = true;
+      S.kbIndex = i;
+    } else if (i >= 0) {
+      S.touchSel = -1;
+      activate(i);
+    }
+  } else if (drag && !drag.moved && S.view === 'shelf') activate(pick());
   else if (drag && !drag.moved && S.view === 'juke' && !S.busy) setView('shelf');
   drag = null;
 });
@@ -627,6 +648,7 @@ addEventListener('pointerdown', (e) => {
   if (!e.target.closest('#theme-menu,#btn-theme')) $('theme-menu').hidden = true;
 });
 setTheme(themeIdx);
+setMedia(S.media);
 $('btn-view').onclick = () => !S.busy && setView(S.view === 'shelf' ? 'juke' : 'shelf');
 $('crumb-root').onclick = backToPlaylists;
 $('vol').oninput = (e) => S.player?.setVolume(e.target.value / 100);
@@ -638,6 +660,12 @@ function updateScrub() {
   const s = $('scrub');
   if (document.activeElement !== s) s.value = shelf.length ? (S.scrollTarget / shelf.length) * 1000 : 0;
 }
+
+addEventListener('ds-ratelimit', (e) => {
+  const secs = e.detail;
+  if (!$('loading').hidden) $('loading-text').textContent = `SPOTIFY SAYS SLOW DOWN… RETRYING IN ${secs}s`;
+  else toast(`Spotify is rate-limiting this app. Retrying in ${secs}s…`);
+});
 
 // ---------- boot ----------
 async function startDemo() {
@@ -714,15 +742,53 @@ initQueueUI({
     S.queue.playAt(i);
   },
 });
+// ---------- start screen: guided setup ----------
+const CID_RE = /^[0-9a-f]{32}$/i;
+function setupState(forceSteps = false) {
+  const v = $('cid').value.trim();
+  const ok = CID_RE.test(v);
+  const saved = !!sp.getClientId() && v === sp.getClientId();
+  $('btn-connect').classList.toggle('disabled', !ok);
+  $('cid-hint').textContent = !v ? '' : ok ? '✓ looks right' : v.length < 32 ? `${32 - v.length} more characters…` : 'that doesn’t look like a Client ID';
+  $('cid-hint').className = `cid-hint ${!v ? '' : ok ? 'good' : 'bad'}`;
+  const collapse = saved && ok && !forceSteps;
+  $('steps').hidden = collapse;
+  $('saved').hidden = !collapse;
+  $('setup-toggle').hidden = !collapse;
+}
 $('cid').value = sp.getClientId();
+$('cid').addEventListener('input', () => setupState(true));
+$('setup-toggle').onclick = () => {
+  setupState(true);
+  $('cid').focus();
+  $('cid').select();
+};
+$('btn-copy').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(sp.redirectUri());
+    $('btn-copy').textContent = 'COPIED ✓';
+  } catch {
+    const r = document.createRange();
+    r.selectNodeContents($('redir'));
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+    $('btn-copy').textContent = 'SELECTED';
+  }
+  setTimeout(() => ($('btn-copy').textContent = 'COPY'), 1600);
+};
+setupState();
 $('btn-demo').onclick = () => {
   startDemo();
   S.player.unlock();
 };
 $('btn-connect').onclick = async () => {
   const id = $('cid').value.trim();
-  if (!id) {
-    $('start-err').textContent = 'Paste your Spotify app Client ID first.';
+  if (!CID_RE.test(id)) {
+    setupState(true);
+    $('start-err').textContent = id ? 'That Client ID doesn’t look right. It’s 32 letters/numbers from your app’s Settings.' : 'Follow the 4 steps above first. You need your own Spotify app’s Client ID.';
+    $('setup').classList.remove('nudge');
+    void $('setup').offsetWidth;
+    $('setup').classList.add('nudge');
     $('cid').focus();
     return;
   }
@@ -735,6 +801,7 @@ $('btn-connect').onclick = async () => {
 };
 
 (async () => {
+  if (new URLSearchParams(location.search).has('demo')) return startDemo();
   try {
     if (await sp.handleRedirect()) {
       $('start').hidden = true;
@@ -744,7 +811,6 @@ $('btn-connect').onclick = async () => {
   } catch (e) {
     $('start-err').textContent = e.message;
   }
-  if (new URLSearchParams(location.search).has('demo')) startDemo();
 })();
 
 // ---------- frame loop ----------
@@ -774,9 +840,9 @@ function frame() {
   S.scroll = damp(S.scroll, S.scrollTarget, 9, dt);
   const mx = S.mouseInside ? S.mouse.x : 0,
     my = S.mouseInside ? S.mouse.y : 0;
-  shelfPos.set(S.scroll + mx * 0.25, 2.7 + my * 0.15, 7.5);
+  shelfPos.set(S.scroll + mx * 0.25, 2.7 + my * 0.15, shelfDist());
   shelfLook.set(S.scroll + mx * 0.1, 2.5, 0);
-  jukePos.set(juke.group.position.x, 2.45, JUKE_Z - 7.3);
+  jukePos.set(juke.group.position.x, juke.viewTarget.y + 0.75, JUKE_Z - jukeDist());
   jukeLook.copy(juke.viewTarget);
 
   if (S.view === 'shelf') {
@@ -787,6 +853,8 @@ function frame() {
       const fy = shelf.homeOf(shelf.hovered).pos.y;
       desiredLook.y += (fy - desiredLook.y) * 0.45;
       desiredPos.y += (fy - desiredLook.y) * 0.3;
+      // phone + search open: aim above the match so it lands below the search panel
+      if (searchOpen() && innerWidth < 760) desiredLook.y = fy + 1.25;
     }
   } else if (S.view === 'juke') {
     desiredPos.copy(jukePos);
@@ -797,7 +865,7 @@ function frame() {
     desiredPos.lerpVectors(shelfPos, jukePos, t);
     desiredPos.x = arm.base.x + (shelfPos.x - arm.base.x) * (1 - t);
     desiredPos.y += Math.sin(t * Math.PI) * 0.8;
-    desiredPos.z = THREE.MathUtils.lerp(7.5, JUKE_Z - 7.3, t);
+    desiredPos.z = THREE.MathUtils.lerp(shelfDist(), JUKE_Z - jukeDist(), t);
     if (t > 0.35 && t < 0.65) desiredPos.z += Math.sin(((t - 0.35) / 0.3) * Math.PI) * 0; // pass under the arm
     arm.grip.getWorldPosition(tmp);
     desiredLook.lerpVectors(shelfLook, jukeLook, t).lerp(tmp, Math.sin(t * Math.PI) * 0.85 + 0.15);
@@ -834,8 +902,9 @@ function frame() {
 
   shelf.update(dt, camera);
   if (!arm.busyAnimating && !S.busy && S.view === 'shelf') {
-    arm.base.x = damp(arm.base.x, S.scroll - 3.2, 2, dt);
-    arm.target.x = damp(arm.target.x, S.scroll - 3.2, 2, dt);
+    const parkX = S.scroll - Math.max(3.2, halfWidth() + 1.8);
+    arm.base.x = damp(arm.base.x, parkX, 2, dt);
+    arm.target.x = damp(arm.target.x, parkX, 2, dt);
     arm.base.y = damp(arm.base.y, CEILING_Y - 0.6, 3, dt);
     arm.base.z = damp(arm.base.z, 3.0, 3, dt);
     arm.target.y = damp(arm.target.y, CEILING_Y - 2.0 + Math.sin(time * 1.3) * 0.05, 3, dt);
@@ -845,6 +914,7 @@ function frame() {
   juke.update(dt, time);
   themeNow.tex = juke.coverTex;
   themeNow.playing = juke.playing;
+  themeNow.speakerY = juke.viewTarget.y + 1.3;
   themeSet.update(dt, time, juke.group.position.x, JUKE_Z, themeNow);
 
   if (S.player) {
@@ -859,4 +929,4 @@ function frame() {
 }
 requestAnimationFrame(frame);
 
-if (import.meta.env.DEV) window.__ds = { S, shelf, openPlaylist, robotPlay };
+if (import.meta.env.DEV) window.__ds = { S, shelf, juke, openPlaylist, robotPlay };

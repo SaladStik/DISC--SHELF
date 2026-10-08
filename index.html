@@ -18,23 +18,34 @@
       <div class="start-inner">
         <div class="logo">DISC<span>//</span>SHELF</div>
         <div class="tag">your spotify library as a wall of jewel cases</div>
-        <div class="menu">
-          <label class="field" id="cid-field">
-            <span>SPOTIFY CLIENT ID</span>
-            <input id="cid" spellcheck="false" autocomplete="off" placeholder="paste from developer.spotify.com" />
-          </label>
-          <button id="btn-connect" class="btn primary">▶ CONNECT SPOTIFY</button>
-          <button id="btn-demo" class="btn">◇ DEMO MODE</button>
-        </div>
-        <details class="help">
-          <summary>SETUP (60 SECONDS)</summary>
-          <ol>
-            <li>Create an app at <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">developer.spotify.com/dashboard</a></li>
-            <li>Add redirect URI <code id="redir"></code></li>
-            <li>Tick <b>Web API</b> + <b>Web Playback SDK</b>, then paste the Client ID above</li>
-            <li>Playback in the browser needs Spotify Premium</li>
+        <div class="setup" id="setup">
+          <div class="setup-head">
+            <span>CONNECT YOUR SPOTIFY</span>
+            <button id="setup-toggle" class="linkish" hidden>change client id</button>
+          </div>
+          <ol class="steps" id="steps">
+            <li>
+              <b>Create a Spotify app</b> (free, takes a minute). Log in, hit <i>Create app</i>, any name works.
+              <a class="btn mini" href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">OPEN DASHBOARD ↗</a>
+            </li>
+            <li>
+              <b>Paste this as the Redirect URI</b>
+              <span class="copyrow"><code id="redir"></code><button id="btn-copy" class="btn mini">COPY</button></span>
+            </li>
+            <li><b>Tick “Web API” and “Web Playback SDK”</b>, then save.</li>
+            <li>
+              <b>Copy the Client ID</b> from your app’s Settings and paste it here:
+              <label class="field" id="cid-field">
+                <input id="cid" spellcheck="false" autocomplete="off" autocapitalize="off" inputmode="text" placeholder="32-character Client ID" />
+                <span id="cid-hint" class="cid-hint"></span>
+              </label>
+            </li>
           </ol>
-        </details>
+          <div class="saved" id="saved" hidden>✓ Client ID saved in this browser</div>
+          <button id="btn-connect" class="btn primary">▶ CONNECT SPOTIFY</button>
+          <div class="fine">Playing music needs Spotify Premium. Your Client ID never leaves this browser.</div>
+        </div>
+        <button id="btn-demo" class="btn ghost">or try the demo first (no account needed)</button>
         <div class="start-err" id="start-err"></div>
       </div>
     </section>

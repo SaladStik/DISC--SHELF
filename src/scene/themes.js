@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { canvas, canvasTexture, requestCover, generateCover } from '../textures.js';
 import { hash } from '../demo.js';
+import { Beat } from '../beat.js';
+import { damp } from '../anim.js';
 
 // Each theme restyles the room surfaces/lighting and builds a 3D "set" around the jukebox.
 // Set coordinates are jukebox-local: +x = screen right, +z = toward the camera, back wall at z = -0.72.
@@ -442,17 +444,6 @@ const recordStore = {
         }
       }
     }
-    // listening station: turntable whose platter spins while music plays
-    K.box(1.0, 0.75, 0.7, K.phong(0x2a1a10, 30), -1.9, 0.38, 1.6);
-    K.box(0.82, 0.1, 0.6, K.phong(0x1b1b1f, 60), -1.9, 0.8, 1.6);
-    const platter = new THREE.Group();
-    platter.position.set(-1.98, 0.87, 1.6);
-    group.add(platter);
-    const vinyl = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.01, 32), K.phong(0x0a0a0a, 120, { specular: 0x555555 }));
-    platter.add(vinyl);
-    const label = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.012, 24), K.cover(crateCovers[0]));
-    platter.add(label);
-    K.box(0.02, 0.02, 0.3, K.phong(0xcfd3dc, 120), -1.7, 0.9, 1.55, 0.3);
     // pendant lamps
     const lamps = [-3.5, 0, 3.5].map((x) => {
       K.cyl(0.01, 0.01, 1.3, K.lambert(0x111111), x, 5.9, 0.6, 4);
@@ -469,8 +460,7 @@ const recordStore = {
     sg.textAlign = 'center';
     sg.fillText('SALE $9.99', 64, 44);
     K.plane(0.9, 0.45, K.lambert(0xffffff, { map: K.tex(sc) }), 3.5, 1.35, 0.82);
-    return (dt, time, now) => {
-      if (now.playing) platter.rotation.y -= dt * 3.5;
+    return (dt, time) => {
       lamps.forEach((l, j) => (l.intensity = 5.5 + Math.sin(time * 2 + j) * 0.2));
       sign.material.opacity = 0.9 + Math.sin(time * 9) * 0.05 * (Math.sin(time * 0.7) > 0.95 ? 6 : 1);
     };
@@ -740,11 +730,45 @@ export class ThemeSet {
     this.textures.forEach((t) => t.dispose());
     this.textures = [];
     this.room.applyTheme(theme);
-    this.tick = theme.build(this.ctx, this.group, kit(this.group, this.textures));
+    const K = kit(this.group, this.textures);
+    this.tick = theme.build(this.ctx, this.group, K);
+    this.speakers = this.addSpeakers(K, theme);
+  }
+
+  /** Wall-mounted PA speakers in every room; the woofers pump with the bass. */
+  addSpeakers(K, theme) {
+    const body = K.phong(0x16151b, 30);
+    const metal = K.phong(0x9aa0ac, 120, { specular: 0xffffff });
+    const ring = K.glow(new THREE.Color(theme.swatch[1]));
+    return [-1, 1].map((side) => {
+      const g = new THREE.Group();
+      g.position.set(side * 3.05, 4.55, -0.2);
+      g.rotation.y = -side * 0.35;
+      g.rotation.x = 0.12;
+      this.group.add(g);
+      const add = (m, x, y, z) => (m.position.set(x, y, z), g.add(m), m);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.2, 0.7), body), 0, 0, 0);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.5), metal), 0, 0.15, -0.55);
+      const woof = add(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.3, 0.12, 28), K.phong(0x0d0d10, 20)), 0, -0.18, 0.38);
+      woof.rotation.x = -Math.PI / 2;
+      const glowRing = add(new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.02, 6, 32), ring), 0, -0.18, 0.36);
+      const tw = add(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.06, 16), metal), 0, 0.36, 0.37);
+      tw.rotation.x = -Math.PI / 2;
+      return { g, woof, glowRing, side };
+    });
   }
 
   update(dt, time, x, z, now) {
-    this.group.position.set(x, 0, z);
+    // the whole set rattles a little on each kick
+    const k = Beat.kick;
+    this.group.position.set(x + (Math.random() - 0.5) * k * 0.02, k * 0.015, z);
+    this.speakers?.forEach((s) => {
+      s.g.position.y = damp(s.g.position.y, now.speakerY ?? 3, 4, dt);
+      s.woof.position.z = 0.38 + k * 0.07 + Beat.bass * 0.02;
+      s.woof.scale.setScalar(1 + k * 0.08);
+      s.glowRing.scale.setScalar(1 + k * 0.15);
+      s.g.rotation.z = (Math.random() - 0.5) * k * 0.02;
+    });
     this.tick?.(dt, time, now);
   }
 }

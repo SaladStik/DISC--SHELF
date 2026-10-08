@@ -40,6 +40,7 @@ export function initQueueUI(c) {
     const q = ctx.getQueue();
     if (e.target.closest('.q-x')) q.remove(i);
     else if (e.target.closest('.q-up')) q.move(i, Math.max(q.index + 1, i - 1));
+    else if (e.target.closest('.q-down')) q.move(i, Math.min(q.items.length - 1, i + 1));
     else if (e.target.closest('.q-top')) q.move(i, q.index + 1);
     else ctx.onPlay(i);
   });
@@ -94,6 +95,8 @@ export function renderQueue(q) {
       <div class="q-meta"><div class="q-t">${esc(t.name)}</div><div class="q-a">${esc(t.artists)}</div></div>
       <span class="q-d">${fmt(t.durationMs)}</span>
       <span class="q-btns">
+        <button class="q-up" title="Move up">↑</button>
+        <button class="q-down" title="Move down">↓</button>
         <button class="q-top" title="Move to top">⤒</button>
         <button class="q-x" title="Remove">✕</button>
       </span>

@@ -36,7 +36,7 @@ function load(key, json = false) {
 }
 
 export function getClientId() {
-  return import.meta.env.VITE_SPOTIFY_CLIENT_ID || load(LS.clientId) || '';
+  return load(LS.clientId) || '';
 }
 export function setClientId(id) {
   store(LS.clientId, id.trim());
@@ -112,7 +112,7 @@ export async function getToken() {
 export async function api(path, { method = 'GET', body, query } = {}) {
   const url = new URL(path.startsWith('http') ? path : `https://api.spotify.com/v1${path}`);
   if (query) Object.entries(query).forEach(([k, v]) => v != null && url.searchParams.set(k, v));
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 6; attempt++) {
     const res = await fetch(url, {
       method,
       headers: {
@@ -122,7 +122,10 @@ export async function api(path, { method = 'GET', body, query } = {}) {
       body: body ? JSON.stringify(body) : undefined,
     });
     if (res.status === 429) {
-      await new Promise((r) => setTimeout(r, (+res.headers.get('Retry-After') || 1) * 1000));
+      // Spotify says slow down: wait as long as it asks (capped), and let the UI show a countdown
+      const secs = Math.min(30, Math.max(1, +res.headers.get('Retry-After') || 2 ** attempt));
+      window.dispatchEvent(new CustomEvent('ds-ratelimit', { detail: secs }));
+      await new Promise((r) => setTimeout(r, secs * 1000));
       continue;
     }
     if (res.status === 204 || res.status === 202) return null;
@@ -167,6 +170,7 @@ export async function getPlaylists(meId) {
         locked: !!meId && p.owner?.id !== meId && !p.collaborative,
         coverUrl: pickImage(p.images) || `gen:${p.id}:${p.name}`,
         total: p.items?.total ?? p.tracks?.total,
+        snapshot: p.snapshot_id,
       });
     }
     next = page.next;
@@ -214,7 +218,7 @@ async function pagedTracks(first, onProgress) {
       onProgress?.(loaded, total);
     }
   };
-  await Promise.all([worker(), worker(), worker(), worker()]);
+  await Promise.all([worker(), worker(), worker()]);
   const tracks = [];
   for (const page of pages) for (const it of page?.items || []) {
     const t = mapTrack(it.item || it.track);
@@ -223,7 +227,50 @@ async function pagedTracks(first, onProgress) {
   return tracks;
 }
 
+// Track lists are cached per playlist snapshot, so reopening an unchanged playlist costs no API calls.
+const CACHE_KEY = 'ds.plcache';
+const memCache = new Map();
+function readCache(key) {
+  if (memCache.has(key)) return memCache.get(key);
+  try {
+    const all = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+    if (all[key]) memCache.set(key, all[key].tracks);
+    return all[key]?.tracks || null;
+  } catch {
+    return null;
+  }
+}
+function writeCache(key, tracks) {
+  memCache.set(key, tracks);
+  try {
+    const all = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+    all[key] = { at: Date.now(), tracks };
+    // keep the 6 most recent playlists, and drop more if storage is full
+    let keys = Object.keys(all).sort((a, b) => all[b].at - all[a].at);
+    for (const k of keys.slice(6)) delete all[k];
+    keys = Object.keys(all).sort((a, b) => all[a].at - all[b].at);
+    for (;;) {
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(all));
+        break;
+      } catch {
+        if (keys.length <= 1) break;
+        delete all[keys.shift()];
+      }
+    }
+  } catch {}
+}
+
 export async function getPlaylistTracks(playlist, onProgress) {
+  const key = playlist.liked ? null : playlist.snapshot && `${playlist.id}:${playlist.snapshot}`;
+  const cached = key && readCache(key);
+  if (cached) return cached;
+  const tracks = await fetchPlaylistTracks(playlist, onProgress);
+  if (key) writeCache(key, tracks);
+  return tracks;
+}
+
+async function fetchPlaylistTracks(playlist, onProgress) {
   if (playlist.liked) return pagedTracks('/me/tracks?limit=50', onProgress);
   // Newer apps use /items; older ones still have /tracks.
   try {
