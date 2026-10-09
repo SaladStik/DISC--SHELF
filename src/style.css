@@ -1583,3 +1583,30 @@ body.searching .pills {
     font-size: 17px;
   }
 }
+
+.repo-link {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  right: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(10, 10, 30, 0.6);
+  backdrop-filter: blur(6px);
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  font-family: var(--pixel);
+  font-size: 11px;
+  color: var(--dim);
+  text-decoration: none;
+  transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.repo-link:hover,
+.repo-link:focus-visible {
+  color: #fff;
+  border-color: var(--cyan);
+  box-shadow: 0 0 16px rgba(126, 249, 255, 0.25);
+  outline: none;
+}
