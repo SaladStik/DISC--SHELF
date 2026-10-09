@@ -85,6 +85,7 @@ async function tokenRequest(body) {
     access: data.access_token,
     refresh: data.refresh_token || prev.refresh,
     expires: Date.now() + (data.expires_in - 60) * 1000,
+    cid: getClientId(), // a login only works with the app (Client ID) that issued it
   };
   store(LS.token, token);
   return token;
@@ -105,7 +106,13 @@ export async function handleRedirect() {
       code_verifier: load(LS.verifier) || '',
     });
   }
-  return !!load(LS.token, true);
+  const t = load(LS.token, true);
+  // switched to a different Spotify app: the old login belongs to the old app, drop it
+  if (t && t.cid && t.cid !== getClientId()) {
+    logout();
+    return false;
+  }
+  return !!t;
 }
 
 export async function getToken() {
@@ -135,6 +142,10 @@ export async function api(path, { method = 'GET', body, query, soft = false } = 
       body: body ? JSON.stringify(body) : undefined,
     });
     if (res.status === 429) {
+      if (res.headers.get('content-type')?.includes('json')) {
+        const j = await res.clone().json().catch(() => null);
+        if (j?.error?.reason === 'QUOTA_EXCEEDED') window.dispatchEvent(new CustomEvent('ds-quota'));
+      }
       // Spotify says slow down: wait as long as it asks (capped), and let the UI show a countdown
       const secs = Math.min(30, Math.max(1, +res.headers.get('Retry-After') || 2 ** attempt));
       limitedUntil = Math.max(limitedUntil, Date.now() + Math.max(secs, 45) * 1000);
@@ -148,6 +159,7 @@ export async function api(path, { method = 'GET', body, query, soft = false } = 
     const data = text ? JSON.parse(text) : null;
     if (!res.ok) {
       const e = new Error(data?.error?.message || `Spotify ${res.status}`);
+      if (data?.error?.reason === 'QUOTA_EXCEEDED') e.message = 'This Spotify app is over its request quota';
       e.status = res.status;
       e.reason = data?.error?.reason;
       throw e;

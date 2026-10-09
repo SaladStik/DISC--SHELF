@@ -663,6 +663,17 @@ function updateScrub() {
   if (document.activeElement !== s) s.value = shelf.length ? (S.scrollTarget / shelf.length) * 1000 : 0;
 }
 
+let quotaWarned = false;
+addEventListener('ds-quota', () => {
+  if (quotaWarned) return;
+  quotaWarned = true;
+  toast('This Spotify app is over its quota. Log out (top right) and connect a different Client ID, or wait it out.');
+});
+$('btn-logout').onclick = () => {
+  sp.logout();
+  location.href = location.pathname; // back to the setup screen; the saved Client ID stays editable
+};
+
 addEventListener('ds-ratelimit', (e) => {
   const secs = e.detail;
   if (!$('loading').hidden) $('loading-text').textContent = `SPOTIFY SAYS SLOW DOWN… RETRYING IN ${secs}s`;
@@ -695,6 +706,7 @@ async function startSpotify() {
   try {
     const me = await sp.getMe();
     $('user').textContent = me.display_name || me.id;
+    $('btn-logout').hidden = false;
     if (me.product && me.product !== 'premium') toast('Heads up: browser playback needs Spotify Premium. Browsing still works.');
     S.playlists = await sp.getPlaylists(me.id);
     bindPlayer(new sp.SpotifyPlayer());
