@@ -253,7 +253,7 @@ export function createStory(app, lib, ui) {
       },
     },
     {
-      caption: { layout: 'title', title: 'DISC//SHELF', body: lib.url || 'diskshelf.saladsync.ca' },
+      caption: { layout: 'title', title: 'DISC//SHELF', body: lib.url || 'discshelf.saladsync.ca' },
       async enter(c) {
         await ensurePlaying();
         await scene({ mode: 'tracks', view: 'juke', media: 'cd' });

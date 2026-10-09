@@ -57,7 +57,7 @@ async function run(progress) {
   const lib = {
     capturedAt: new Date().toISOString(),
     user: { name: me.display_name || me.id },
-    url: 'diskshelf.saladsync.ca',
+    url: 'discshelf.saladsync.ca',
     playlists: playlists.filter((p) => !p.liked),
     tracks,
     featured: featured?.id,

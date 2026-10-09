@@ -10,7 +10,7 @@ music; otherwise it runs silently.
 1. **Refresh the snapshot** (only when your playlists change): log in on `http://127.0.0.1:5173/`,
    then open `http://127.0.0.1:5173/pitch/?capture`. It reads every playlist you own, saves them to
    `public/pitch/library.json` and opens the pitch. Commit that file so the deployed `/pitch/` has it.
-2. Open `/pitch/` (locally or `https://diskshelf.saladsync.ca/pitch/`) and wait for the loading bar:
+2. Open `/pitch/` (locally or `https://discshelf.saladsync.ca/pitch/`) and wait for the loading bar:
    it builds every room and player ahead so nothing loads on stage (~10 s).
 3. For real audio: be logged in to the app in the same browser (Premium), then press any key once
    to unlock audio.
@@ -44,4 +44,4 @@ Rehearse a single step from the console with `pitchGo(n)`.
 | 9 | Rooms cycling | "Pick your room: record store, 90s bedroom, arcade, vapor lounge, all dressed with your own covers." | 14 |
 | 10 | Turntable, boombox | "And your format: CDs, vinyl with a turntable, or tapes with a boombox. The shelf, the robot and the player all change." | 14 |
 | 11 | Vinyl wall | "No backend: Three.js, the Spotify Web API and the Web Playback SDK, all in the browser, on desktop and phones." | 12 |
-| 12 | Closing title | "DISC//SHELF. Try it at diskshelf.saladsync.ca." | 6 |
+| 12 | Closing title | "DISC//SHELF. Try it at discshelf.saladsync.ca." | 6 |

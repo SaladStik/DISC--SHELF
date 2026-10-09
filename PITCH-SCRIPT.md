@@ -129,7 +129,7 @@ what makes 3:00 comfortable. Don't rush the holds; talk over them.
 
 > Your music deserves somewhere to **live**.
 > *[beat]*
-> This is DISC//SHELF. Try it at **diskshelf.saladsync.ca**. Thank you.
+> This is DISC//SHELF. Try it at **discshelf.saladsync.ca**. Thank you.
 
 ## What changes from day to day
 
