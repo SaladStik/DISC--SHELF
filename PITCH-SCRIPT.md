@@ -9,12 +9,16 @@ on that step.
 
 ## Speakers
 
-| Speaker | Part | Steps |
-|---|---|---|
-| **Speaker 1** (lead, it's their library on screen) | Opening, the problem, playing a song, the close | 0–2, 6–8, 12 |
-| **Speaker 2** | Browsing at scale, search, rooms, formats, how it's built | 3–5, 9–11 |
+| Speaker | Part | Steps | ~Talk time |
+|---|---|---|---|
+| **Speaker 1** (lead, it's their library on screen) | Opening, the problem, how it's built, the close | 0–2, 11–12 | 55 s |
+| **Speaker 2** | Browsing at scale and search; then rooms and formats | 3–5, 9–10 | 65 s |
+| **Speaker 3** | Playing a song: the robot, the queue, the bass | 6–8 | 50 s |
 
-One person presses → every time. **Press on the last word of the line**, not after it: the camera
+The order of voices is 1 → 2 → 3 → 2 → 1. Speaker 2 comes back for the look of the app, and
+Speaker 1 takes it home, so the opening and closing come from the same voice.
+
+One person presses → every time (Speaker 1 is easiest: they're on stage at both ends). **Press on the last word of the line**, not after it: the camera
 takes a second or two to arrive, and the next line starts as it settles. The deck never waits for
 you: if a step's animation is still running when you press, it cuts cleanly to the next one.
 
@@ -86,9 +90,9 @@ what makes 3:00 comfortable. Don't rush the holds; talk over them.
 > *[beat]*
 > Everything else goes dark, and the camera flies to each match.
 
-### 6–8 · Playing a song (S1)
+### 6–8 · Playing a song (S3)
 
-**6** *Press. Wait for the robot arm to start moving before speaking.*
+**6** *Speaker 2 hands over on "match". Press, and wait for the robot arm to start moving before speaking.*
 > Pick one, and the **robot** does the rest.
 > *Let the arm carry the disc across the room. Speak again as it drops into the jukebox.*
 > Into the jukebox, and it's playing, through **real Spotify**.
@@ -103,9 +107,9 @@ what makes 3:00 comfortable. Don't rush the holds; talk over them.
 > And the whole room **listens**. Speakers pump, shelves rattle, lights hit on every kick.
 > Turn on mic sync and it reacts to the **actual** bass in the room.
 
-### 9–11 · Rooms, formats, how it's built (S2)
+### 9–10 · Rooms and formats (S2)
 
-**9** *Press. The room starts changing. Speak over the changes, don't wait for them.*
+**9** *Speaker 3 hands back on "bass in the room". Press. The room starts changing; speak over the changes, don't wait for them.*
 > And it's your room. A 90s bedroom… an arcade… a vapor lounge… or back to the record store.
 > Every poster and every crate is dressed with **your own** covers.
 
@@ -115,13 +119,13 @@ what makes 3:00 comfortable. Don't rush the holds; talk over them.
 > **Tapes**, and you get cassettes and a boombox. The shelf, the robot and the player all change
 > with it.
 
-**11** *The vinyl wall; records slide out one by one.*
-> There's no backend. It's Three.js and the Spotify Web API, running entirely in your browser,
+### 11–12 · How it's built, and the close (S1)
+
+**11** *Speaker 2 hands back on "change with it". The vinyl wall; records slide out one by one.*
+> And there's no backend. It's Three.js and the Spotify Web API, running entirely in your browser,
 > on desktop and on your **phone**.
 
-### 12 · The close (S1)
-
-*The closing title. Hand back with a look; Speaker 1 closes.*
+**12** *The closing title.*
 
 > Your music deserves somewhere to **live**.
 > *[beat]*

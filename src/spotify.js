@@ -1,5 +1,7 @@
 // Spotify Web API + Web Playback SDK, using Authorization Code with PKCE (no client secret).
 
+import { cacheGet, cacheSet } from './cache.js';
+
 const SCOPES = [
   'user-read-private',
   'user-read-email',
@@ -113,9 +115,16 @@ export async function getToken() {
   return t.access;
 }
 
-export async function api(path, { method = 'GET', body, query } = {}) {
+// Spotify rate-limits per app (Client ID) in a rolling 30 s window. After a 429 we hold off
+// "soft" reads (ones with a cached fallback) for a while instead of digging the hole deeper.
+let limitedUntil = 0;
+export const isLimited = () => Date.now() < limitedUntil;
+const limitedError = () => Object.assign(new Error('Rate limited by Spotify'), { status: 429 });
+
+export async function api(path, { method = 'GET', body, query, soft = false } = {}) {
   const url = new URL(path.startsWith('http') ? path : `https://api.spotify.com/v1${path}`);
   if (query) Object.entries(query).forEach(([k, v]) => v != null && url.searchParams.set(k, v));
+  if (soft && isLimited()) throw limitedError();
   for (let attempt = 0; attempt < 6; attempt++) {
     const res = await fetch(url, {
       method,
@@ -128,6 +137,8 @@ export async function api(path, { method = 'GET', body, query } = {}) {
     if (res.status === 429) {
       // Spotify says slow down: wait as long as it asks (capped), and let the UI show a countdown
       const secs = Math.min(30, Math.max(1, +res.headers.get('Retry-After') || 2 ** attempt));
+      limitedUntil = Math.max(limitedUntil, Date.now() + Math.max(secs, 45) * 1000);
+      if (soft) throw limitedError(); // the caller has a cached copy to fall back on
       window.dispatchEvent(new CustomEvent('ds-ratelimit', { detail: secs }));
       await new Promise((r) => setTimeout(r, secs * 1000));
       continue;
@@ -143,8 +154,24 @@ export async function api(path, { method = 'GET', body, query } = {}) {
     }
     return data;
   }
-  throw new Error('Rate limited by Spotify');
+  throw limitedError();
 }
+
+/**
+ * Cache-first read: fresh cache → no request; stale → refresh, but keep the cached copy if
+ * Spotify says no (rate limit, network). Only a cold miss can fail.
+ */
+async function cached(key, ttlMs, fetcher) {
+  const hit = await cacheGet(key);
+  if (hit && Date.now() - hit.at < ttlMs) return hit.value;
+  try {
+    return await cacheSet(key, await fetcher());
+  } catch (e) {
+    if (hit) return hit.value;
+    throw e;
+  }
+}
+const MIN = 60000;
 
 const pickImage = (images, min = 280) => {
   if (!images?.length) return null;
@@ -153,16 +180,20 @@ const pickImage = (images, min = 280) => {
 };
 
 export async function getMe() {
-  return api('/me');
+  return cached('me', 6 * 60 * MIN, () => api('/me', { soft: true }));
 }
 
 export async function getPlaylists(meId) {
+  return cached(`playlists:${meId || 'me'}`, 10 * MIN, () => fetchPlaylists(meId));
+}
+
+async function fetchPlaylists(meId) {
   const out = [
     { id: 'liked', uri: null, name: 'Liked Songs', owner: 'you', coverUrl: 'gen:liked:Liked Songs', liked: true },
   ];
   let next = '/me/playlists?limit=50';
   while (next && out.length < 300) {
-    const page = await api(next);
+    const page = await api(next, { soft: true });
     for (const p of page.items || []) {
       if (!p) continue;
       out.push({
@@ -231,47 +262,16 @@ async function pagedTracks(first, onProgress) {
   return tracks;
 }
 
-// Track lists are cached per playlist snapshot, so reopening an unchanged playlist costs no API calls.
-const CACHE_KEY = 'ds.plcache';
-const memCache = new Map();
-function readCache(key) {
-  if (memCache.has(key)) return memCache.get(key);
-  try {
-    const all = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-    if (all[key]) memCache.set(key, all[key].tracks);
-    return all[key]?.tracks || null;
-  } catch {
-    return null;
-  }
-}
-function writeCache(key, tracks) {
-  memCache.set(key, tracks);
-  try {
-    const all = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-    all[key] = { at: Date.now(), tracks };
-    // keep the 6 most recent playlists, and drop more if storage is full
-    let keys = Object.keys(all).sort((a, b) => all[b].at - all[a].at);
-    for (const k of keys.slice(6)) delete all[k];
-    keys = Object.keys(all).sort((a, b) => all[a].at - all[b].at);
-    for (;;) {
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(all));
-        break;
-      } catch {
-        if (keys.length <= 1) break;
-        delete all[keys.shift()];
-      }
-    }
-  } catch {}
-}
+// Track lists live in IndexedDB keyed by the playlist's snapshot: an unchanged playlist never
+// costs another request. Liked Songs has no snapshot, so it refreshes every couple of hours.
+try {
+  localStorage.removeItem('ds.plcache'); // the old localStorage cache
+} catch {}
 
 export async function getPlaylistTracks(playlist, onProgress) {
-  const key = playlist.liked ? null : playlist.snapshot && `${playlist.id}:${playlist.snapshot}`;
-  const cached = key && readCache(key);
-  if (cached) return cached;
-  const tracks = await fetchPlaylistTracks(playlist, onProgress);
-  if (key) writeCache(key, tracks);
-  return tracks;
+  const key = playlist.liked ? 'tracks:liked' : playlist.snapshot ? `tracks:${playlist.id}:${playlist.snapshot}` : `tracks:${playlist.id}`;
+  const ttl = playlist.liked || !playlist.snapshot ? 2 * 60 * MIN : Infinity;
+  return cached(key, ttl, () => fetchPlaylistTracks(playlist, onProgress));
 }
 
 async function fetchPlaylistTracks(playlist, onProgress) {
@@ -286,8 +286,10 @@ async function fetchPlaylistTracks(playlist, onProgress) {
 }
 
 export async function searchTracks(q) {
-  const res = await api('/search', { query: { q, type: 'track', limit: 8 } });
-  return (res?.tracks?.items || []).map(mapTrack).filter(Boolean);
+  return cached(`search:${q.trim().toLowerCase()}`, 24 * 60 * MIN, async () => {
+    const res = await api('/search', { query: { q, type: 'track', limit: 8 }, soft: true });
+    return (res?.tracks?.items || []).map(mapTrack).filter(Boolean);
+  });
 }
 
 export async function getQueue() {
