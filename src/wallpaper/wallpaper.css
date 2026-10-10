@@ -1,0 +1,39 @@
+/* Wallpaper Engine: the page gets mouse moves and clicks but no keyboard or wheel, and can't control
+   playback. So everything that is a control goes, and the read-outs sit clear of the taskbar. */
+:root {
+  --taskbar: 48px;
+}
+#start,
+#toast,
+.top,
+.scrub-wrap,
+.controls,
+.vol,
+.hc-keys,
+.pills,
+body.no-np .player,
+.player:has(.np-art:not([src])) {
+  display: none;
+}
+body.no-mouse #app {
+  pointer-events: none;
+}
+.hover-card {
+  bottom: calc(var(--taskbar) + 20px);
+}
+.player {
+  left: auto;
+  right: 24px;
+  bottom: calc(var(--taskbar) + 20px);
+  width: 380px;
+  height: auto;
+  grid-template-columns: 56px 1fr;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  pointer-events: none !important;
+}
+.progress {
+  grid-column: 1 / -1;
+}

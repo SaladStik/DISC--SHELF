@@ -336,6 +336,7 @@ async function shuffleAction() {
 
 function activate(i) {
   if (i < 0 || S.busy) return;
+  if (app.onActivate?.(i) === false) return; // an embedding host (the wallpaper) may veto a click
   if (S.mode === 'playlists') openPlaylist(S.playlists[i]);
   else robotPlay(i);
 }
@@ -851,9 +852,13 @@ const shelfPos = new THREE.Vector3(),
   desiredPos = new THREE.Vector3(),
   desiredLook = new THREE.Vector3();
 let hoverFrame = 0;
+let frameGap = 0, // ms between frames when a host caps the frame rate (0 = every display frame)
+  lastFrame = 0;
 arm.park(2);
 
-function frame() {
+function frame(now) {
+  if (frameGap && now - lastFrame < frameGap - 2) return requestAnimationFrame(frame);
+  lastFrame = now;
   const dt = Math.min(clock.getDelta(), 1 / 20);
   const time = clock.elapsedTime;
   updateTweens(dt);
@@ -967,5 +972,8 @@ export const app = {
     return THEMES[themeIdx].id;
   },
   toggleQueue, openSearch, closeSearch, searchOpen, startSnapshot, startDemo,
+  bindPlayer, enter,
+  setFpsLimit: (fps) => (frameGap = fps > 0 ? 1000 / fps : 0),
+  onActivate: null,
 };
 if (import.meta.env.DEV) window.__ds = app;

@@ -1,0 +1,39 @@
+{
+  "file": "index.html",
+  "title": "DISC//SHELF",
+  "description": "Your Spotify library as a wall of jewel cases. The robot fetches whatever your PC is playing and the room moves to the real bass.",
+  "type": "web",
+  "tags": ["Music"],
+  "general": {
+    "supportsaudioprocessing": true,
+    "properties": {
+      "room": {
+        "order": 1,
+        "text": "Room",
+        "type": "combo",
+        "value": "records",
+        "options": [
+          { "label": "Record store", "value": "records" },
+          { "label": "90s bedroom", "value": "bedroom" },
+          { "label": "Arcade", "value": "arcade" },
+          { "label": "Vapor lounge", "value": "vapor" }
+        ]
+      },
+      "format": {
+        "order": 2,
+        "text": "Format",
+        "type": "combo",
+        "value": "cd",
+        "options": [
+          { "label": "CD", "value": "cd" },
+          { "label": "Vinyl", "value": "vinyl" },
+          { "label": "Tape", "value": "tape" }
+        ]
+      },
+      "bass": { "order": 3, "text": "Bass reaction", "type": "slider", "value": 1, "min": 0, "max": 2, "fraction": true, "step": 0.1 },
+      "nowplaying": { "order": 4, "text": "Show now playing", "type": "bool", "value": true },
+      "mouse": { "order": 5, "text": "React to the mouse", "type": "bool", "value": true },
+      "taskbar": { "order": 6, "text": "Taskbar height", "type": "slider", "value": 48, "min": 0, "max": 120 }
+    }
+  }
+}
