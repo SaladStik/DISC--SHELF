@@ -2,7 +2,7 @@
 
 import { cacheGet, cacheSet } from './cache.js';
 
-const SCOPES = [
+export const SCOPES = [
   'user-read-private',
   'user-read-email',
   'playlist-read-private',
@@ -38,7 +38,7 @@ function load(key, json = false) {
 }
 
 export function getClientId() {
-  return load(LS.clientId) || '';
+  return load(LS.clientId) || import.meta.env?.VITE_SPOTIFY_CLIENT_ID || '';
 }
 export function setClientId(id) {
   store(LS.clientId, id.trim());

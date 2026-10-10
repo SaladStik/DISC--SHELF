@@ -1,12 +1,12 @@
-/* Wallpaper Engine: the page gets mouse moves and clicks but no keyboard or wheel, and can't control
-   playback. So everything that is a control goes, and the read-outs sit clear of the taskbar. */
+/* Wallpaper Engine: the page gets mouse moves and clicks but no keyboard or wheel. So the keyboard's
+   controls go, the two the mouse needs (back to playlists, the shelf scrubber) show while it moves,
+   and the read-outs sit clear of the taskbar. */
 :root {
   --taskbar: 48px;
 }
 #start,
-#toast,
-.top,
-.scrub-wrap,
+.brand,
+.top-right,
 .controls,
 .vol,
 .hc-keys,
@@ -17,6 +17,19 @@ body.no-np .player,
 }
 body.no-mouse #app {
   pointer-events: none;
+}
+.top,
+.scrub-wrap {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+body.hands .top,
+body.hands .scrub-wrap {
+  opacity: 1;
+}
+.scrub-wrap {
+  top: 52px;
+  bottom: auto;
 }
 .hover-card {
   bottom: calc(var(--taskbar) + 20px);

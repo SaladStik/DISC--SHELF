@@ -30,6 +30,22 @@ const shared = {
   glare: new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.1, shininess: 160, specular: 0xffffff, depthWrite: false }),
 };
 const geoFor = (kind) => (shared.geo[kind] ||= new THREE.BoxGeometry(KINDS[kind].W, KINDS[kind].H, KINDS[kind].D));
+const edgeFor = (kind) => (kind === 'cd' || kind === 'tape' ? shared.edge : kind === 'vinyl' ? shared.sleeveEdge : shared.binderEdge);
+
+// Almost every case on the shelf is at rest between its neighbours, showing only its spine and its
+// top and bottom edges. Those are drawn together as one instanced mesh (2 draw calls for the whole
+// shelf instead of 6 per case), with every spine a layer of one texture array.
+const LAYERS = 512; // shortcut: cases beyond this many alive at once keep their own mesh, raise it for huge screens
+const AT_REST = new THREE.Matrix4().makeRotationY(Math.PI / 2);
+const spineShader = (tex) => (s) => {
+  s.uniforms.spines = { value: tex };
+  s.vertexShader = s.vertexShader
+    .replace('#include <common>', '#include <common>\nattribute float layer;\nvarying vec3 vSpine;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSpine = vec3(uv.x, 1.0 - uv.y, layer);');
+  s.fragmentShader = s.fragmentShader
+    .replace('#include <common>', '#include <common>\nuniform sampler2DArray spines;\nvarying vec3 vSpine;')
+    .replace('#include <map_fragment>', 'diffuseColor *= texture(spines, vSpine);');
+};
 
 class Case {
   constructor(item, index, kind) {
@@ -53,7 +69,7 @@ class Case {
     this.spineTex = canvasTexture(sc);
     this.spineMat = new THREE.MeshLambertMaterial({ map: this.spineTex, emissive: 0x000000 });
     this.coverMat = new THREE.MeshPhongMaterial({ color: 0x2a2833, shininess: 70, specular: 0x333344 });
-    const edge = kind === 'cd' || kind === 'tape' ? shared.edge : kind === 'vinyl' ? shared.sleeveEdge : shared.binderEdge;
+    const edge = edgeFor(kind);
     // Box material order: +x, -x, +y, -y, +z, -z. Spine is -x, cover is +z.
     this.body = new THREE.Mesh(geoFor(kind), [edge, this.spineMat, edge, edge, this.coverMat, shared.back]);
     this.body.userData.case = this;
@@ -89,6 +105,7 @@ class Case {
         this.discMat.needsUpdate = true;
         k.draw(this.spineCanvas, item, e.color, kind === 'binder' ? e.image : null);
         this.spineTex.needsUpdate = true;
+        this.onSpine?.();
       },
       this,
     );
@@ -183,12 +200,29 @@ export class Shelf {
     this.glare.removeFromParent();
     this.furniture.traverse((o) => o.geometry?.dispose());
     this.furniture.clear();
+    if (this.rest) {
+      this.rest.removeFromParent();
+      this.rest.geometry.dispose();
+      this.rest.material[1].dispose();
+      this.spines.dispose();
+    }
   }
 
   drop(c) {
     c.group.removeFromParent();
     c.dispose();
     this.active.delete(c);
+    if (c.layer != null) this.free.push(c.layer);
+    this.restDirty = true;
+  }
+
+  /** Copy a case's spine into its layer of the texture array. */
+  paintSpine(c) {
+    if (c.layer == null) return;
+    const [w, h] = this.k.spine;
+    this.spines.image.data.set(c.spineCanvas.getContext('2d').getImageData(0, 0, w, h).data, c.layer * w * h * 4);
+    this.spines.addLayerUpdate(c.layer);
+    this.spines.needsUpdate = true;
   }
 
   build(items, kind) {
@@ -200,6 +234,24 @@ export class Shelf {
     const k = (this.k = KINDS[kind]);
     this.rows = k.rows || ROWS;
     this.rowH = k.rowH || ROW_H;
+
+    const [sw, sh] = k.spine;
+    const n = Math.max(1, Math.min(items.length, LAYERS));
+    this.spines = new THREE.DataArrayTexture(new Uint8Array(sw * sh * 4 * n), sw, sh, n);
+    this.spines.colorSpace = THREE.SRGBColorSpace;
+    this.spines.generateMipmaps = true;
+    this.spines.minFilter = THREE.LinearMipmapLinearFilter;
+    this.spines.magFilter = THREE.LinearFilter;
+    this.free = [...Array(n).keys()];
+    const geo = geoFor(kind).clone();
+    geo.groups = [{ start: 6, count: 6, materialIndex: 1 }, { start: 12, count: 12, materialIndex: 2 }]; // spine, then top and bottom
+    geo.setAttribute('layer', new THREE.InstancedBufferAttribute(new Float32Array(n), 1));
+    const spineMat = new THREE.MeshLambertMaterial();
+    spineMat.onBeforeCompile = spineShader(this.spines);
+    this.rest = new THREE.InstancedMesh(geo, [null, spineMat, edgeFor(kind)], n);
+    this.rest.frustumCulled = false;
+    this.rest.count = 0;
+    this.group.add(this.rest);
     const slot = k.D + k.gap;
     const perRow = (this.perRow = Math.max(4, Math.ceil(items.length / this.rows)));
     const bay = 30; // slots per bookcase bay, with a divider between bays
@@ -274,6 +326,9 @@ export class Shelf {
         if (fresh) c.appearDelay = Math.max(0, (x - x0) * 0.09) + row * 0.08;
         else c.appear = 1;
         c.playing = c.hideDisc = this.items[i].id === this.playingId;
+        c.layer = this.free.pop();
+        c.onSpine = () => this.paintSpine(c);
+        c.onSpine();
         this.live.set(i, c);
         this.applyFilter(c);
         this.group.add(c.group);
@@ -334,6 +389,7 @@ export class Shelf {
   applyFilter(c) {
     const dim = this.filter && !this.filter.has(c.index);
     c.spineMat.color.setScalar(dim ? 0.16 : 1);
+    this.restDirty = true;
   }
 
   setPlaying(id) {
@@ -349,7 +405,30 @@ export class Shelf {
   }
 
   update(dt, camera) {
-    for (const c of this.active) if (!c.update(dt, camera.position.x, camera.position.z)) this.active.delete(c);
+    for (const c of this.active) {
+      const moving = c.update(dt, camera.position.x, camera.position.z);
+      if (!moving) this.active.delete(c);
+      // the last case has no neighbour hiding its side, so it keeps its own mesh
+      const resting = !moving && c.pop === 0 && c.layer != null && c.index < this.items.length - 1;
+      if (resting !== c.resting) {
+        c.resting = resting;
+        c.body.visible = !resting;
+        this.restDirty = true;
+      }
+    }
+    if (!this.restDirty) return;
+    this.restDirty = false;
+    const rest = this.rest;
+    const layers = rest.geometry.attributes.layer;
+    rest.count = 0;
+    for (const c of this.live.values()) {
+      if (!c.resting) continue;
+      rest.setMatrixAt(rest.count, AT_REST.setPosition(c.home));
+      rest.setColorAt(rest.count, c.spineMat.color);
+      layers.array[rest.count++] = c.layer;
+    }
+    rest.instanceMatrix.needsUpdate = layers.needsUpdate = true;
+    if (rest.instanceColor) rest.instanceColor.needsUpdate = true;
   }
 
   /** Item whose shelf slot contains world point (x, y). Ignores where popped cases currently are. */

@@ -1,28 +1,50 @@
 /**
- * DISC//SHELF as a Wallpaper Engine web wallpaper.
+ * DISC//SHELF as a Wallpaper Engine web wallpaper (see WALLPAPER.md).
  *
- * Wallpaper Engine can't log in to Spotify or play it (no redirect, no DRM), so the wallpaper runs
- * on a saved library (window.DS_LIBRARY, see WALLPAPER.md) or the demo one, and follows whatever
- * the PC is playing: the bass comes from the real audio, and each new song is fetched by the robot.
+ * The bass comes from the PC's real audio. Signed in (npm run wallpaper:login), it shows your
+ * library and a clicked disc plays: in the wallpaper itself if Wallpaper Engine's browser can run
+ * Spotify's player, otherwise on your Spotify app. Signed out, it runs on a saved or demo library.
+ * Whenever something else on the PC plays the music, the robot fetches each new song.
  */
 import '../style.css';
 import './wallpaper.css';
 import './sim.js';
 import { app } from '../main.js';
 import { Beat } from '../beat.js';
+import * as sp from '../spotify.js';
 import { demoPlaylists, demoTracks } from '../demo.js';
 
 const { S, shelf } = app;
 const W = window;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// ---------- library ----------
-let lib = W.DS_LIBRARY;
-if (!lib) {
-  const playlists = demoPlaylists();
-  lib = { playlists, tracks: Object.fromEntries(playlists.map((p) => [p.id, demoTracks(p)])) };
+// ---------- login baked in by the build; the wallpaper keeps its own refreshed copy from then on ----------
+const login = W.DS_LOGIN;
+if (login && localStorage.getItem('ds.seed') !== login.refresh) {
+  localStorage.setItem('ds.seed', login.refresh);
+  localStorage.setItem('ds.clientId', login.cid);
+  localStorage.setItem('ds.token', JSON.stringify(login));
 }
-lib.playlists = lib.playlists.filter((p) => lib.tracks[p.id]?.length); // binders we can't open are no use here
+let signedIn = !!localStorage.getItem('ds.token');
+
+// ---------- library ----------
+let lib;
+async function spotifyLibrary() {
+  const me = await sp.getMe();
+  const playlists = (await sp.getPlaylists(me.id)).filter((p) => !p.locked);
+  const tracks = {};
+  for (const p of playlists) tracks[p.id] = await sp.getPlaylistTracks(p).catch(() => []);
+  return { playlists, tracks };
+}
+function use(l) {
+  l.playlists = l.playlists.filter((p) => l.tracks[p.id]?.length); // binders we can't open are no use here
+  lib = S.snapshot = l;
+  S.playlists = l.playlists;
+}
+function demoLibrary() {
+  const playlists = demoPlaylists();
+  return { playlists, tracks: Object.fromEntries(playlists.map((p) => [p.id, demoTracks(p)])) };
+}
 
 const norm = (s) => (s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 function find(title, artist) {
@@ -34,8 +56,9 @@ function find(title, artist) {
   }
 }
 
-// ---------- a player that only mirrors the PC's media session ----------
-const player = {
+// ---------- a player that mirrors the PC's media session, and can ask the Spotify app to play ----------
+let following = false; // the robot is fetching what the PC already plays: don't start it again
+const remote = {
   ready: Promise.resolve(),
   state: { paused: true, position: 0, duration: 0, at: 0 },
   listeners: [],
@@ -49,9 +72,11 @@ const player = {
   show(track) {
     this.listeners.forEach((fn) => fn('track', track));
   },
-  // the robot delivered the disc: nothing to start, the PC is already playing it
-  async play({ tracks, index = 0 }) {
+  async play({ tracks, index = 0, positionMs = 0 }) {
     this.show(tracks[index]);
+    if (!signedIn || following) return;
+    await sp.api('/me/player/play', { method: 'PUT', body: { uris: tracks.map((t) => t.uri), offset: { position: index }, position_ms: positionMs } });
+    this.set({ paused: false, position: positionMs, duration: tracks[index].durationMs });
   },
   progress() {
     const s = this.state;
@@ -61,36 +86,16 @@ const player = {
   unlock() {},
 };
 
-S.snapshot = lib;
-S.playlists = lib.playlists;
-app.bindPlayer(player);
-app.enter();
-app.onActivate = () => S.mode === 'playlists'; // a click opens a binder; what plays is up to the PC
-
-// ---------- Wallpaper Engine: audio, now playing, settings ----------
+// ---------- Wallpaper Engine: audio and settings ----------
 W.wallpaperRegisterAudioListener?.((bins) => Beat.feedSpectrum(bins));
 
-let next = null; // the song the PC just started, waiting for the robot
-let last, thumb, settle;
-W.wallpaperRegisterMediaThumbnailListener?.((e) => (thumb = e.thumbnail));
-W.wallpaperRegisterMediaPropertiesListener?.((e) => {
-  thumb = null;
-  clearTimeout(settle);
-  // shortcut: the cover arrives in its own event, so give it 700 ms; a later one is ignored
-  settle = setTimeout(() => {
-    if (!e.title || e.title + e.artist === last) return;
-    last = e.title + e.artist;
-    next = { id: `sys:${last}`, uri: `sys:${last}`, name: e.title, artists: e.artist, album: e.albumTitle, coverUrl: thumb || `gen:${last}:${e.albumTitle || e.title}` };
-  }, 700);
-});
-W.wallpaperRegisterMediaPlaybackListener?.((e) => player.set({ paused: e.state !== W.wallpaperMediaIntegration.PLAYBACK_PLAYING }));
-W.wallpaperRegisterMediaTimelineListener?.((e) => player.set({ position: e.position * 1000, duration: e.duration * 1000 }));
-
+let volume = 0.6;
 W.wallpaperPropertyListener = {
   applyUserProperties(p) {
     if (p.room) app.setTheme(p.room.value);
     if (p.format) app.setMedia(p.format.value);
     if (p.bass) Beat.gain = p.bass.value;
+    if (p.volume) S.player?.setVolume?.((volume = p.volume.value / 100));
     if (p.nowplaying) document.body.classList.toggle('no-np', !p.nowplaying.value);
     if (p.mouse) document.body.classList.toggle('no-mouse', !p.mouse.value);
     if (p.taskbar) document.documentElement.style.setProperty('--taskbar', `${p.taskbar.value}px`);
@@ -100,22 +105,44 @@ W.wallpaperPropertyListener = {
   },
 };
 
-// ---------- autopilot ----------
+// ---------- now playing, from Windows media controls ----------
+let next = null; // the song the PC just started, waiting for the robot
+function followMedia() {
+  let last, thumb, settle;
+  W.wallpaperRegisterMediaThumbnailListener?.((e) => (thumb = e.thumbnail));
+  W.wallpaperRegisterMediaPropertiesListener?.((e) => {
+    thumb = null;
+    clearTimeout(settle);
+    // shortcut: the cover arrives in its own event, so give it 700 ms; a later one is ignored
+    settle = setTimeout(() => {
+      if (!e.title || e.title + e.artist === last) return;
+      last = e.title + e.artist;
+      next = { id: `sys:${last}`, uri: `sys:${last}`, name: e.title, artists: e.artist, album: e.albumTitle, coverUrl: thumb || `gen:${last}:${e.albumTitle || e.title}` };
+    }, 700);
+  });
+  W.wallpaperRegisterMediaPlaybackListener?.((e) => remote.set({ paused: e.state !== W.wallpaperMediaIntegration.PLAYBACK_PLAYING }));
+  W.wallpaperRegisterMediaTimelineListener?.((e) => remote.set({ position: e.position * 1000, duration: e.duration * 1000 }));
+}
+
 /** A song from the library gets the full robot run; anything else goes straight in the jukebox. */
 async function present(track) {
   const hit = find(track.name, track.artists);
   if (hit) {
+    following = true;
     if (S.mode !== 'tracks' || S.playlist !== hit.pl) await app.openPlaylist(hit.pl);
     await app.robotPlay(hit.index);
     S.queue.clearUpcoming(); // we don't know what the PC plays next
+    clearTimeout(S.queue.syncTimer);
+    following = false;
   } else {
     Object.assign(S.queue, { items: [], index: -1, pendingUntil: 0 });
-    player.show(track);
+    remote.show(track);
     app.flash(0.4);
     app.setView('juke');
   }
 }
 
+// ---------- autopilot ----------
 let i = 0;
 let left = 8; // cases to skim before changing shelves
 async function browse() {
@@ -133,15 +160,44 @@ async function browse() {
   await sleep(1500);
 }
 
-let lastMouse = -1e9;
-addEventListener('pointermove', () => (lastMouse = performance.now()));
+let hands; // while the mouse moves it has the shelf, and its controls show
+addEventListener('pointermove', () => {
+  document.body.classList.add('hands');
+  clearTimeout(hands);
+  hands = setTimeout(() => document.body.classList.remove('hands'), 5000);
+});
+
 (async () => {
+  use((signedIn && (await spotifyLibrary().catch(() => (signedIn = false)))) || W.DS_LIBRARY || demoLibrary());
+
+  // Spotify's in-page player needs DRM that Wallpaper Engine's browser may not have: first answer wins
+  const sdk = signedIn && new sp.SpotifyPlayer();
+  const local =
+    sdk &&
+    (await new Promise((done) => {
+      sdk.ready.then(() => done(true), () => done(false));
+      sdk.on((type) => type === 'error' && done(false));
+      setTimeout(done, 8000, false);
+    }));
+  if (!local) followMedia();
+
+  app.bindPlayer(local ? sdk : remote);
+  S.player.setVolume?.(volume);
+  app.enter();
+  app.onActivate = () => signedIn || S.mode === 'playlists'; // signed out, a click can only open a binder
+
+  let checked = performance.now();
   for (;;) {
-    if (S.busy || performance.now() - lastMouse < 5000) await sleep(500); // the mouse has the shelf
+    // new songs: the playlist list is one request, and only playlists that changed are read again
+    if (signedIn && performance.now() - checked > 15 * 60000) {
+      checked = performance.now();
+      await spotifyLibrary().then(use, () => {});
+    }
+    if (S.busy || document.body.classList.contains('hands')) await sleep(500);
     else if (next) {
       const track = next;
       next = null;
-      await present(track);
+      if (track.name !== S.queue.current?.name) await present(track); // else it's the disc we just started ourselves
       for (let n = 0; n < 24 && !next; n++) await sleep(500); // watch it play for a bit
     } else await browse();
   }

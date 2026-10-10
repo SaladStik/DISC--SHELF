@@ -62,6 +62,7 @@ function renderThemeMenu() {
 }
 
 function resize() {
+  renderer.setPixelRatio(1 / Math.max(1, Math.ceil(innerHeight / 1440))); // 4K gets whole 2x2 pixels: the picture is 576 lines anyway
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
   camera.fov = camera.aspect < 1 ? 42 + (1 - camera.aspect) * 36 : 42;
@@ -852,6 +853,7 @@ const shelfPos = new THREE.Vector3(),
   desiredPos = new THREE.Vector3(),
   desiredLook = new THREE.Vector3();
 let hoverFrame = 0;
+let lastClock = '';
 let frameGap = 0, // ms between frames when a host caps the frame rate (0 = every display frame)
   lastFrame = 0;
 arm.park(2);
@@ -952,8 +954,12 @@ function frame(now) {
 
   if (S.player) {
     const { position, duration } = S.player.progress();
-    $('t-cur').textContent = fmt(position);
-    $('t-dur').textContent = fmt(duration);
+    const clock = `${fmt(position)}/${fmt(duration)}`;
+    if (clock !== lastClock) {
+      lastClock = clock;
+      $('t-cur').textContent = fmt(position);
+      $('t-dur').textContent = fmt(duration);
+    }
     $('t-bar').style.width = duration ? `${(position / duration) * 100}%` : '0';
   }
   updateScrub();

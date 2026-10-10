@@ -31,9 +31,10 @@
         ]
       },
       "bass": { "order": 3, "text": "Bass reaction", "type": "slider", "value": 1, "min": 0, "max": 2, "fraction": true, "step": 0.1 },
-      "nowplaying": { "order": 4, "text": "Show now playing", "type": "bool", "value": true },
-      "mouse": { "order": 5, "text": "React to the mouse", "type": "bool", "value": true },
-      "taskbar": { "order": 6, "text": "Taskbar height", "type": "slider", "value": 48, "min": 0, "max": 120 }
+      "volume": { "order": 4, "text": "Volume (when the wallpaper itself plays)", "type": "slider", "value": 60, "min": 0, "max": 100 },
+      "nowplaying": { "order": 5, "text": "Show now playing", "type": "bool", "value": true },
+      "mouse": { "order": 6, "text": "React to the mouse", "type": "bool", "value": true },
+      "taskbar": { "order": 7, "text": "Taskbar height", "type": "slider", "value": 48, "min": 0, "max": 120 }
     }
   }
 }

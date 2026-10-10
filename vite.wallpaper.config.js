@@ -5,6 +5,8 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 // Wallpaper Engine opens the page from file://, where ES modules and CORS-checked assets don't load,
 // so the build is one classic script.
 const SNAPSHOT = 'public/pitch/library.json'; // saved by /pitch/?capture
+const LOGIN = '.spotify-login.json'; // saved by npm run wallpaper:login
+const json = (file) => (existsSync(file) ? readFileSync(file, 'utf8') : 'null');
 
 export default defineConfig({
   root: 'wallpaper',
@@ -18,7 +20,8 @@ export default defineConfig({
     {
       name: 'file-protocol',
       transformIndexHtml: { order: 'post', handler: (html) => html.replace('<script type="module" crossorigin', '<script defer').replace('rel="stylesheet" crossorigin', 'rel="stylesheet"') },
-      closeBundle: () => writeFileSync('dist-wallpaper/library.js', `window.DS_LIBRARY = ${existsSync(SNAPSHOT) ? readFileSync(SNAPSHOT, 'utf8') : 'null'};`),
+      closeBundle: () => writeFileSync('dist-wallpaper/library.js', `window.DS_LIBRARY = ${json(SNAPSHOT)};
+window.DS_LOGIN = ${json(LOGIN)};`),
     },
   ],
 });
