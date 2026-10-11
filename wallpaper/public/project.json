@@ -7,6 +7,7 @@
   "general": {
     "supportsaudioprocessing": true,
     "properties": {
+      "spotify": { "order": 0, "text": "Spotify login code", "type": "textinput", "value": "" },
       "room": {
         "order": 1,
         "text": "Room",

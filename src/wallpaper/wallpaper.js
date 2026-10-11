@@ -1,7 +1,7 @@
 /**
  * DISC//SHELF as a Wallpaper Engine web wallpaper (see WALLPAPER.md).
  *
- * The bass comes from the PC's real audio. Signed in (npm run wallpaper:login), it shows your
+ * The bass comes from the PC's real audio. Signed in (the "Spotify login code" setting), it shows your
  * library and a clicked disc plays: in the wallpaper itself if Wallpaper Engine's browser can run
  * Spotify's player, otherwise on your Spotify app. Signed out, it runs on a saved or demo library.
  * Whenever something else on the PC plays the music, the robot fetches each new song.
@@ -18,13 +18,6 @@ const { S, shelf } = app;
 const W = window;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// ---------- login baked in by the build; the wallpaper keeps its own refreshed copy from then on ----------
-const login = W.DS_LOGIN;
-if (login && localStorage.getItem('ds.seed') !== login.refresh) {
-  localStorage.setItem('ds.seed', login.refresh);
-  localStorage.setItem('ds.clientId', login.cid);
-  localStorage.setItem('ds.token', JSON.stringify(login));
-}
 let signedIn = !!localStorage.getItem('ds.token');
 
 // ---------- library ----------
@@ -92,6 +85,16 @@ W.wallpaperRegisterAudioListener?.((bins) => Beat.feedSpectrum(bins));
 let volume = 0.6;
 W.wallpaperPropertyListener = {
   applyUserProperties(p) {
+    // a new login code ("clientId:refreshToken" from the website's /?wallpaper): take it and start over.
+    // From then on the wallpaper keeps its own refreshed token.
+    if (p.spotify && p.spotify.value !== (localStorage.getItem('ds.code') || '')) {
+      const [cid, refresh] = p.spotify.value.trim().split(':');
+      localStorage.setItem('ds.code', p.spotify.value);
+      localStorage.setItem('ds.clientId', cid);
+      if (refresh) localStorage.setItem('ds.token', JSON.stringify({ refresh, expires: 0, cid }));
+      else localStorage.removeItem('ds.token');
+      return location.reload();
+    }
     if (p.room) app.setTheme(p.room.value);
     if (p.format) app.setMedia(p.format.value);
     if (p.bass) Beat.gain = p.bass.value;

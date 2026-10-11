@@ -2,7 +2,7 @@
 
 import { cacheGet, cacheSet } from './cache.js';
 
-export const SCOPES = [
+const SCOPES = [
   'user-read-private',
   'user-read-email',
   'playlist-read-private',
@@ -66,6 +66,16 @@ export async function login() {
 
 export function logout() {
   store(LS.token, null);
+}
+
+/**
+ * The login as a code for the Wallpaper Engine wallpaper's settings (see WALLPAPER.md). A refresh
+ * token only keeps working in one place, so handing it over signs this browser out.
+ */
+export function handOffLogin() {
+  const t = load(LS.token, true);
+  logout();
+  return `${t.cid || getClientId()}:${t.refresh}`;
 }
 
 async function tokenRequest(body) {

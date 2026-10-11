@@ -830,10 +830,12 @@ $('btn-connect').onclick = async () => {
 };
 
 (async () => {
-  if (window.DS_PITCH) return; // the pitch page boots the app itself
+  if (window.DS_PITCH || window.DS_WALLPAPER) return; // the pitch page and the wallpaper boot the app themselves
   if (new URLSearchParams(location.search).has('demo')) return startDemo();
   try {
     if (await sp.handleRedirect()) {
+      if (new URLSearchParams(location.search).has('wallpaper'))
+        return prompt('Paste this into the wallpaper’s “Spotify login code” setting. This browser is now logged out.', sp.handOffLogin());
       $('start').hidden = true;
       $('hud').hidden = false;
       await startSpotify();

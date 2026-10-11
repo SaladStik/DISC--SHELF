@@ -10,22 +10,22 @@ DISC//SHELF in Wallpaper Engine.
 
 ## Signing in to Spotify
 
-Wallpaper Engine has no address Spotify could redirect a login back to, so you sign in once from the
-terminal and the build carries the login into the wallpaper:
+Wallpaper Engine has no address Spotify could redirect a login back to, so you sign in on the
+website and hand the login over as a code:
 
-1. Put your Client ID in `.env.local`: `VITE_SPOTIFY_CLIENT_ID=...` (the Spotify app needs
-   `http://127.0.0.1:5173/` as a Redirect URI, the same one the website uses).
-2. `npm run wallpaper:login`, open the link it prints, approve. Stop `npm run dev` first: it uses
-   the same port.
-3. `npm run wallpaper` and copy `dist-wallpaper/` over again.
+1. Log in on the website as usual (`npm run dev`, or the deployed site), with your Client ID.
+2. Open the same site with `/?wallpaper` on the end. It shows a code and logs that browser out
+   (a Spotify login only keeps working in one place).
+3. Paste the code into **Spotify login code** in the wallpaper's settings in Wallpaper Engine.
+
+`VITE_SPOTIFY_CLIENT_ID` in `.env.local` prefills the Client ID on the website.
 
 Signed in, the shelves hold your own playlists and a clicked disc really plays: inside the wallpaper
 if Wallpaper Engine's browser can run Spotify's player, otherwise on whichever Spotify app is open
 (Premium either way). Everything read from Spotify is cached, so an unchanged library costs a
 couple of requests per start.
 
-`dist-wallpaper/library.js` then contains your login. Don't share that folder or publish it to the
-Workshop.
+The code is a login: don't share it, or a preset that contains it.
 
 ## What it does
 

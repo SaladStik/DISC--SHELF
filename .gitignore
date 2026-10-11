@@ -1,7 +1,6 @@
 node_modules
 dist
 dist-wallpaper
-.spotify-login.json
 .env
 .env.*
 !.env.example
