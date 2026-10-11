@@ -92,13 +92,15 @@ W.wallpaperPropertyListener = {
       sp.logout();
       if (sp.getClientId() === p.clientid.value.trim()) return location.reload();
     }
-    // the address the browser ended on after approving carries the code that finishes the login
-    const code = p.callback?.value.match(/[?&]code=([^&]+)/)?.[1];
+    if (p.redirect) W.DS_REDIRECT = p.redirect.value.trim();
+    // the code the website showed after approving finishes the login (a whole pasted address works too)
+    const pasted = p.code?.value.trim() || '';
+    const code = pasted.match(/[?&]code=([^&]+)/)?.[1] || pasted;
     if (code && code !== localStorage.getItem('ds.code')) {
       localStorage.setItem('ds.code', code);
       sp.finishLogin(code).then(
         () => location.reload(),
-        () => signIn && (signIn.textContent = 'Spotify didn’t take that address. Click here to try again.'),
+        () => signIn && (signIn.textContent = 'Spotify didn’t take that code. Click here to try again.'),
       );
     }
     if (p.room) app.setTheme(p.room.value);
@@ -116,7 +118,8 @@ W.wallpaperPropertyListener = {
 
 // ---------- signing in ----------
 // Spotify signs you in on a web page, and a wallpaper gets no keyboard. So a click here opens that
-// page in the browser, and the address it ends on comes back through the wallpaper's settings.
+// page in the browser, it ends on the website showing a code, and the code comes back through the
+// wallpaper's settings.
 let signIn;
 function askToSignIn() {
   signIn = document.body.appendChild(Object.assign(document.createElement('button'), { id: 'signin', className: 'btn primary', textContent: '▶ CLICK TO SIGN IN TO SPOTIFY' }));
@@ -125,7 +128,7 @@ function askToSignIn() {
     window.open(url);
     navigator.clipboard?.writeText(url).catch(() => {}); // in case nothing opened
     signIn.textContent =
-      'Approve in your browser (if none opened, the link is on your clipboard). The page after that won’t load: copy its address into “Spotify sign-in address” in this wallpaper’s settings.';
+      'Approve in your browser (if none opened, the link is on your clipboard), then copy the code it shows into “Spotify sign-in code” in this wallpaper’s settings.';
   };
 }
 

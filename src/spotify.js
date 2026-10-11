@@ -20,8 +20,9 @@ const LS = {
   token: 'ds.token',
 };
 
-// The wallpaper has no address of its own: it borrows the dev server's, and the user carries the code back.
-export const redirectUri = () => (window.DS_WALLPAPER ? 'http://127.0.0.1:5173/' : window.location.origin + '/');
+// The wallpaper has no address of its own: it sends the login through the website (DS_REDIRECT), which
+// shows the code for the user to carry back. `state` tells the website the code isn't its own.
+export const redirectUri = () => window.DS_REDIRECT || window.location.origin + '/';
 
 function store(key, val) {
   try {
@@ -61,6 +62,7 @@ export async function loginUrl() {
     code_challenge_method: 'S256',
     code_challenge: challenge,
     scope: SCOPES,
+    ...(window.DS_REDIRECT && { state: 'wallpaper' }),
   });
   return `https://accounts.spotify.com/authorize?${params}`;
 }

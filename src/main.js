@@ -831,7 +831,17 @@ $('btn-connect').onclick = async () => {
 
 (async () => {
   if (window.DS_PITCH || window.DS_WALLPAPER) return; // the pitch page and the wallpaper boot the app themselves
-  if (new URLSearchParams(location.search).has('demo')) return startDemo();
+  const q = new URLSearchParams(location.search);
+  if (q.has('demo')) return startDemo();
+  // a login started by the Wallpaper Engine wallpaper: only it can finish it, so hand the code over
+  if (q.get('state') === 'wallpaper') {
+    $('btn-demo').hidden = true;
+    $('setup').innerHTML = q.has('code')
+      ? `<div class="setup-head"><span>ALMOST THERE</span></div>Copy this into <b>Spotify sign-in code</b> in the wallpaper’s settings in Wallpaper Engine:<span class="copyrow"><code>${escapeHtml(q.get('code'))}</code><button id="btn-code" class="btn mini">COPY</button></span>`
+      : 'Spotify login cancelled. Click the wallpaper to try again.';
+    if (q.has('code')) $('btn-code').onclick = () => navigator.clipboard.writeText(q.get('code')).then(() => ($('btn-code').textContent = 'COPIED ✓'));
+    return;
+  }
   try {
     if (await sp.handleRedirect()) {
       $('start').hidden = true;

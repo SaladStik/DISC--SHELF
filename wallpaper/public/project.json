@@ -8,7 +8,7 @@
     "supportsaudioprocessing": true,
     "properties": {
       "clientid": { "order": -2, "text": "Spotify Client ID", "type": "textinput", "value": "" },
-      "callback": { "order": -1, "text": "Spotify sign-in address", "type": "textinput", "value": "" },
+      "code": { "order": -1, "text": "Spotify sign-in code", "type": "textinput", "value": "" },
       "room": {
         "order": 1,
         "text": "Room",
@@ -36,7 +36,8 @@
       "volume": { "order": 4, "text": "Volume (when the wallpaper itself plays)", "type": "slider", "value": 60, "min": 0, "max": 100 },
       "nowplaying": { "order": 5, "text": "Show now playing", "type": "bool", "value": true },
       "mouse": { "order": 6, "text": "React to the mouse", "type": "bool", "value": true },
-      "taskbar": { "order": 7, "text": "Taskbar height", "type": "slider", "value": 48, "min": 0, "max": 120 }
+      "taskbar": { "order": 7, "text": "Taskbar height", "type": "slider", "value": 48, "min": 0, "max": 120 },
+      "redirect": { "order": 8, "text": "Spotify Redirect URI (only if you host the site yourself)", "type": "textinput", "value": "https://discshelf.saladsync.ca/" }
     }
   }
 }

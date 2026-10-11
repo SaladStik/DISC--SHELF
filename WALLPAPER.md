@@ -11,16 +11,16 @@ DISC//SHELF in Wallpaper Engine.
 ## Signing in to Spotify
 
 Everything is in the wallpaper's settings in Wallpaper Engine, except the approval itself: Spotify
-only does that on a web page, and a wallpaper gets no keyboard.
+only does that on a web page, and a wallpaper gets no keyboard. Nothing needs to be installed.
 
-1. Paste your Client ID into **Spotify Client ID**. The Spotify app needs `http://127.0.0.1:5173/`
-   among its Redirect URIs (the one `npm run dev` uses).
+1. Paste your Client ID into **Spotify Client ID**. It is the same Spotify app the website has you
+   create, with the website's address as its Redirect URI.
 2. Click **CLICK TO SIGN IN TO SPOTIFY** on the wallpaper and approve in the browser tab it opens
    (if none opens, the link is on your clipboard).
-3. The page after that doesn't load, on purpose: copy its address (`http://127.0.0.1:5173/?code=…`)
-   into **Spotify sign-in address**. Don't have `npm run dev` running, or it takes the code itself.
+3. The website then shows a code. Copy it into **Spotify sign-in code**.
 
-Clear the Client ID to sign out. `VITE_SPOTIFY_CLIENT_ID` in `.env.local` only prefills the website.
+Clear the Client ID to sign out. If you host the website yourself, put its address in
+**Spotify Redirect URI**; that site needs this version deployed, or it will try to use the code itself.
 
 Signed in, the shelves hold your own playlists and a clicked disc really plays: inside the wallpaper
 if Wallpaper Engine's browser can run Spotify's player, otherwise on whichever Spotify app is open
