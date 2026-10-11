@@ -7,6 +7,7 @@
   "general": {
     "supportsaudioprocessing": true,
     "properties": {
+      "signinhelp": { "order": -3, "text": "<b>Sign in to Spotify</b> (optional: without it you get a demo library)<br>1. Open <a href='https://developer.spotify.com/dashboard'>developer.spotify.com/dashboard</a>, log in and press <i>Create app</i>. Any name works.<br>2. As Redirect URI enter <b>https://diskshelf.saladsync.ca/</b>, tick <i>Web API</i>, and save.<br>3. Open the app's <i>Settings</i>, copy its <b>Client ID</b> and paste it below.<br>4. A blue sign-in button appears on the wallpaper. Click it and approve in your browser.<br>5. The page then shows a code. Copy it and paste it into <b>Spotify sign-in code</b> below.<br>Playing discs needs Spotify Premium and Spotify open on one of your devices.", "type": "text" },
       "clientid": { "order": -2, "text": "Spotify Client ID", "type": "textinput", "value": "" },
       "code": { "order": -1, "text": "Spotify sign-in code", "type": "textinput", "value": "" },
       "room": {
