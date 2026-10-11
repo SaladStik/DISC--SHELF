@@ -41,6 +41,19 @@ body.hands .scrub-wrap {
   white-space: normal;
   line-height: 1.5;
 }
+#diag {
+  position: fixed;
+  top: 80px;
+  right: 24px;
+  z-index: 30;
+  margin: 0;
+  padding: 10px 12px;
+  font: 12px/1.5 var(--mono);
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  pointer-events: none;
+}
 .hover-card {
   bottom: calc(var(--taskbar) + 20px);
 }

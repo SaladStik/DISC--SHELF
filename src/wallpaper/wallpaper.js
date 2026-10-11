@@ -2,8 +2,8 @@
  * DISC//SHELF as a Wallpaper Engine web wallpaper (see WALLPAPER.md).
  *
  * The bass comes from the PC's real audio. Signed in (through its settings, see below), it shows your
- * library and a clicked disc plays: in the wallpaper itself if Wallpaper Engine's browser can run
- * Spotify's player, otherwise on your Spotify app. Signed out, it runs on a saved or demo library.
+ * library and a clicked disc plays on one of your Spotify devices (Wallpaper Engine's browser can't
+ * be one itself: Spotify's in-page player needs DRM). Signed out, it runs on a saved or demo library.
  * Whenever something else on the PC plays the music, the robot fetches each new song.
  */
 import '../style.css';
@@ -76,6 +76,7 @@ const remote = {
       // no device picked (or it's gone) and none active: an open but idle Spotify app will do
       if (e.status !== 404) throw e;
       const { devices } = await sp.api('/me/player/devices');
+      note(`devices: ${devices.map((d) => d.name + (d.is_active ? ' (active)' : '')).join(', ') || 'none'}`);
       this.device = (devices.find((d) => d.is_active) || devices[0])?.id;
       if (!this.device) throw new Error('Open Spotify first: the wallpaper plays through it.');
       await send();
@@ -90,10 +91,23 @@ const remote = {
   unlock() {},
 };
 
+// ---------- diagnostics (the "Show diagnostics" setting): what was asked of Spotify, and what it said ----------
+const diag = document.body.appendChild(Object.assign(document.createElement('pre'), { id: 'diag', hidden: true }));
+function note(line) {
+  diag.textContent = [...diag.textContent.split('\n'), `${new Date().toLocaleTimeString()} ${line}`].slice(-14).join('\n');
+}
+const realFetch = W.fetch;
+W.fetch = async (url, o = {}) => {
+  const res = await realFetch(url, o);
+  if (String(url).includes('spotify.com')) note(`${o.method || 'GET'} ${new URL(url).pathname} ${new URL(url).searchParams.get('device_id') || ''} → ${res.status}`);
+  return res;
+};
+addEventListener('error', (e) => note(`error: ${e.message}`));
+addEventListener('unhandledrejection', (e) => note(`error: ${e.reason?.message || e.reason}`));
+
 // ---------- Wallpaper Engine: audio and settings ----------
 W.wallpaperRegisterAudioListener?.((bins) => Beat.feedSpectrum(bins));
 
-let volume = 0.6;
 W.wallpaperPropertyListener = {
   applyUserProperties(p) {
     // a new Client ID is a new login (clearing it signs out); the check after saving is for a browser
@@ -117,7 +131,12 @@ W.wallpaperPropertyListener = {
     if (p.room) app.setTheme(p.room.value);
     if (p.format) app.setMedia(p.format.value);
     if (p.bass) Beat.gain = p.bass.value;
-    if (p.volume) S.player?.setVolume?.((volume = p.volume.value / 100));
+    // only a change is sent on, so starting up costs no request
+    if (p.volume && signedIn && String(p.volume.value) !== localStorage.getItem('ds.volume')) {
+      localStorage.setItem('ds.volume', p.volume.value);
+      sp.api('/me/player/volume', { method: 'PUT', query: { volume_percent: p.volume.value, device_id: remote.device } }).catch(() => {});
+    }
+    if (p.diag) diag.hidden = !p.diag.value;
     if (p.nowplaying) document.body.classList.toggle('no-np', !p.nowplaying.value);
     if (p.mouse) document.body.classList.toggle('no-mouse', !p.mouse.value);
     if (p.taskbar) document.documentElement.style.setProperty('--taskbar', `${p.taskbar.value}px`);
@@ -155,6 +174,7 @@ function devicePicker() {
       b.textContent = `${d.id === remote.device ? '▶ ' : ''}${d.name}`;
       b.onclick = () => {
         localStorage.setItem('ds.device', (remote.device = d.id));
+        note(`picked ${d.name}`);
         sp.api('/me/player', { method: 'PUT', body: { device_ids: [d.id] } }).catch(() => {}); // move what's playing there
         menu.hidden = true;
         S.menuOpen = false;
@@ -233,20 +253,11 @@ addEventListener('pointermove', () => {
 (async () => {
   use((signedIn && (await spotifyLibrary().catch(() => (signedIn = false)))) || W.DS_LIBRARY || demoLibrary());
 
-  // Spotify's in-page player needs DRM that Wallpaper Engine's browser may not have: first answer wins
-  const sdk = signedIn && new sp.SpotifyPlayer();
-  const local =
-    sdk &&
-    (await new Promise((done) => {
-      sdk.ready.then(() => done(true), () => done(false));
-      sdk.on((type) => type === 'error' && done(false));
-      setTimeout(done, 8000, false);
-    }));
-  if (!local) followMedia();
-  if (signedIn && !local) devicePicker();
+  followMedia();
+  if (signedIn) devicePicker();
+  note(signedIn ? `signed in, ${lib.playlists.length} playlists, device ${remote.device || 'not picked'}` : 'signed out');
 
-  app.bindPlayer(local ? sdk : remote);
-  S.player.setVolume?.(volume);
+  app.bindPlayer(remote);
   app.enter();
   app.onActivate = () => signedIn || S.mode === 'playlists'; // signed out, a click can only open a binder
   if (!signedIn && sp.getClientId()) askToSignIn();

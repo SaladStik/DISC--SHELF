@@ -33,10 +33,11 @@
         ]
       },
       "bass": { "order": 3, "text": "Bass reaction", "type": "slider", "value": 1, "min": 0, "max": 2, "fraction": true, "step": 0.1 },
-      "volume": { "order": 4, "text": "Volume (when the wallpaper itself plays)", "type": "slider", "value": 60, "min": 0, "max": 100 },
+      "volume": { "order": 4, "text": "Spotify volume", "type": "slider", "value": 60, "min": 0, "max": 100 },
       "nowplaying": { "order": 5, "text": "Show now playing", "type": "bool", "value": true },
       "mouse": { "order": 6, "text": "React to the mouse", "type": "bool", "value": true },
       "taskbar": { "order": 7, "text": "Taskbar height", "type": "slider", "value": 48, "min": 0, "max": 120 },
+      "diag": { "order": 9, "text": "Show diagnostics", "type": "bool", "value": false },
       "redirect": { "order": 8, "text": "Spotify Redirect URI (only if you host the site yourself)", "type": "textinput", "value": "https://diskshelf.saladsync.ca/" }
     }
   }

@@ -22,10 +22,12 @@ only does that on a web page, and a wallpaper gets no keyboard. Nothing needs to
 Clear the Client ID to sign out. If you host the website yourself, put its address in
 **Spotify Redirect URI**; that site needs this version deployed, or it will try to use the code itself.
 
-Signed in, the shelves hold your own playlists and a clicked disc really plays: inside the wallpaper
-if Wallpaper Engine's browser can run Spotify's player, otherwise on whichever Spotify app is open
-(Premium either way). Everything read from Spotify is cached, so an unchanged library costs a
-couple of requests per start.
+Signed in, the shelves hold your own playlists and a clicked disc really plays, on one of your
+Spotify devices (Premium needed; the wallpaper can't be a Spotify player itself). Everything read
+from Spotify is cached, so an unchanged library costs a couple of requests per start.
+
+If something doesn't work, turn on **Show diagnostics**: it lists what the wallpaper asked of Spotify
+and what Spotify answered.
 
 ## What it does
 

@@ -162,7 +162,10 @@ export async function api(path, { method = 'GET', body, query, soft = false } = 
     }
     if (res.status === 204 || res.status === 202) return null;
     const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {} // player commands sometimes answer 200 with a body that isn't JSON
     if (!res.ok) {
       const e = new Error(data?.error?.message || `Spotify ${res.status}`);
       if (data?.error?.reason === 'QUOTA_EXCEEDED') e.message = 'This Spotify app is over its request quota';
