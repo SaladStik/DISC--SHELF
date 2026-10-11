@@ -81,6 +81,15 @@ const remote = {
       if (!this.device) throw new Error('Open Spotify first: the wallpaper plays through it.');
       await send();
     });
+    // Spotify can accept the command (204) and an idle app still does nothing: look, wake it, ask again
+    await sleep(1500);
+    const now = await sp.api('/me/player').catch(() => null);
+    note(`now: ${now ? `${now.is_playing ? 'playing' : 'not playing'} on ${now.device?.name}` : 'nothing active'}`);
+    if (!now?.is_playing && this.device) {
+      await sp.api('/me/player', { method: 'PUT', body: { device_ids: [this.device], play: true } });
+      await sleep(1500);
+      await send();
+    }
     this.set({ paused: false, position: positionMs, duration: tracks[index].durationMs });
   },
   progress() {
@@ -167,6 +176,7 @@ function devicePicker() {
   const chip = document.querySelector('.top').appendChild(Object.assign(document.createElement('button'), { className: 'chip', textContent: '♪ DEVICE' }));
   chip.onclick = async () => {
     const { devices } = await sp.api('/me/player/devices').catch(() => ({ devices: [] }));
+    note(`devices: ${devices.map((d) => `${d.name} [${d.type}${d.is_active ? ', active' : ''}${d.id === remote.device ? ', picked' : ''}]`).join(', ') || 'none'}`);
     const menu = document.getElementById('ctx'); // the app's right-click menu, which a click elsewhere closes
     menu.innerHTML = `<div class="ctx-title">${devices.length ? 'PLAY ON' : 'OPEN SPOTIFY FIRST'}</div>`;
     for (const d of devices) {
