@@ -37,7 +37,7 @@
       "nowplaying": { "order": 5, "text": "Show now playing", "type": "bool", "value": true },
       "mouse": { "order": 6, "text": "React to the mouse", "type": "bool", "value": true },
       "taskbar": { "order": 7, "text": "Taskbar height", "type": "slider", "value": 48, "min": 0, "max": 120 },
-      "redirect": { "order": 8, "text": "Spotify Redirect URI (only if you host the site yourself)", "type": "textinput", "value": "https://discshelf.saladsync.ca/" }
+      "redirect": { "order": 8, "text": "Spotify Redirect URI (only if you host the site yourself)", "type": "textinput", "value": "https://diskshelf.saladsync.ca/" }
     }
   }
 }
