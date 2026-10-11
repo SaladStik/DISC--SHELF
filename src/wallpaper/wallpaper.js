@@ -81,18 +81,28 @@ const remote = {
       if (!this.device) throw new Error('Open Spotify first: the wallpaper plays through it.');
       await send();
     });
-    // Spotify can accept the command (204) and an idle app still does nothing: look, wake it, ask again
+    // Spotify can accept the command (204) and the app still does nothing: look, wake it, ask again,
+    // and as a last resort ask for the playlist itself, starting at this song
     const look = async (label) => {
       await sleep(1500);
       const now = await sp.api('/me/player').catch(() => null);
-      note(`${label}: ${now ? `${now.is_playing ? 'playing' : 'not playing'} "${now.item?.name}" at ${Math.round(now.progress_ms / 1000)}s on ${now.device?.name}, volume ${now.device?.volume_percent}` : 'nothing active'}`);
+      const d = now?.device;
+      note(
+        now
+          ? `${label}: ${now.is_playing ? 'playing' : 'not playing'} ${now.item?.name || now.currently_playing_type} at ${Math.round(now.progress_ms / 1000)}s on ${d?.name} [${d?.type}${d?.is_restricted ? ', RESTRICTED' : ''}${d?.is_private_session ? ', private' : ''}] vol ${d?.volume_percent}, disallows ${Object.keys(now.actions?.disallows || {}).join(' ') || 'nothing'}`
+          : `${label}: nothing active`,
+      );
       return now?.is_playing;
     };
+    note(`asked for ${tracks[index].uri} "${tracks[index].name}" +${tracks.length - 1} more`);
     if (!(await look('now')) && this.device) {
       await sp.api('/me/player', { method: 'PUT', body: { device_ids: [this.device], play: true } });
       await sleep(1500);
       await send();
-      await look('after retry');
+      if (!(await look('after retry')) && S.playlist?.uri) {
+        await sp.api('/me/player/play', { method: 'PUT', query: { device_id: this.device }, body: { context_uri: S.playlist.uri, offset: { uri: tracks[index].uri } } });
+        await look('as playlist');
+      }
     }
     this.set({ paused: false, position: positionMs, duration: tracks[index].durationMs });
   },
@@ -107,7 +117,7 @@ const remote = {
 // ---------- diagnostics (the "Show diagnostics" setting): what was asked of Spotify, and what it said ----------
 const diag = document.body.appendChild(Object.assign(document.createElement('pre'), { id: 'diag', hidden: true }));
 function note(line) {
-  diag.textContent = [...diag.textContent.split('\n'), `${new Date().toLocaleTimeString()} ${line}`].slice(-14).join('\n');
+  diag.textContent = [...diag.textContent.split('\n'), `${new Date().toLocaleTimeString()} ${line}`].slice(-18).join('\n');
 }
 const realFetch = W.fetch;
 W.fetch = async (url, o = {}) => {
