@@ -68,7 +68,16 @@ const remote = {
   async play({ tracks, index = 0, positionMs = 0 }) {
     this.show(tracks[index]);
     if (!signedIn || following) return;
-    await sp.api('/me/player/play', { method: 'PUT', body: { uris: tracks.map((t) => t.uri), offset: { position: index }, position_ms: positionMs } });
+    const send = () =>
+      sp.api('/me/player/play', { method: 'PUT', query: { device_id: this.device }, body: { uris: tracks.map((t) => t.uri), offset: { position: index }, position_ms: positionMs } });
+    await send().catch(async (e) => {
+      // an open but idle Spotify app isn't "active": find it and name it (remembered for next time)
+      if (e.status !== 404) throw e;
+      const { devices } = await sp.api('/me/player/devices');
+      this.device = (devices.find((d) => d.is_active) || devices[0])?.id;
+      if (!this.device) throw new Error('Open Spotify first: the wallpaper plays through it.');
+      await send();
+    });
     this.set({ paused: false, position: positionMs, duration: tracks[index].durationMs });
   },
   progress() {
