@@ -1,5 +1,10 @@
 # DISC//SHELF as a Wallpaper Engine wallpaper
 
+The wallpaper is on the Steam Workshop:
+<https://steamcommunity.com/sharedfiles/filedetails/?id=3818066442>. Subscribe and pick DISC//SHELF.
+
+To build it yourself instead:
+
 ```
 npm run wallpaper
 ```
