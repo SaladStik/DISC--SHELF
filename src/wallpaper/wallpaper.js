@@ -157,6 +157,7 @@ function devicePicker() {
         localStorage.setItem('ds.device', (remote.device = d.id));
         sp.api('/me/player', { method: 'PUT', body: { device_ids: [d.id] } }).catch(() => {}); // move what's playing there
         menu.hidden = true;
+        S.menuOpen = false;
       };
     }
     const r = chip.getBoundingClientRect();
@@ -191,11 +192,14 @@ async function present(track) {
   const hit = find(track.name, track.artists);
   if (hit) {
     following = true;
-    if (S.mode !== 'tracks') await app.openPlaylist(hit.pl);
-    await app.robotPlay(hit.index);
-    S.queue.clearUpcoming(); // we don't know what the PC plays next
-    clearTimeout(S.queue.syncTimer);
-    following = false;
+    try {
+      if (S.mode !== 'tracks') await app.openPlaylist(hit.pl);
+      await app.robotPlay(hit.index);
+      S.queue.clearUpcoming(); // we don't know what the PC plays next
+      clearTimeout(S.queue.syncTimer);
+    } finally {
+      following = false;
+    }
   } else {
     Object.assign(S.queue, { items: [], index: -1, pendingUntil: 0 });
     remote.show(track);
@@ -263,7 +267,7 @@ addEventListener('pointermove', () => {
     else if (next) {
       const track = next;
       next = null;
-      if (track.name !== S.queue.current?.name) await present(track); // else it's the disc we just started ourselves
+      if (track.name !== S.queue.current?.name) await present(track).catch(console.error); // else it's the disc we just started ourselves
       for (let n = 0; n < 24 && !next; n++) await sleep(500); // watch it play for a bit
     } else await browse();
   }
