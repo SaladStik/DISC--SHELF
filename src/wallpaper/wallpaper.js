@@ -82,13 +82,17 @@ const remote = {
       await send();
     });
     // Spotify can accept the command (204) and an idle app still does nothing: look, wake it, ask again
-    await sleep(1500);
-    const now = await sp.api('/me/player').catch(() => null);
-    note(`now: ${now ? `${now.is_playing ? 'playing' : 'not playing'} on ${now.device?.name}` : 'nothing active'}`);
-    if (!now?.is_playing && this.device) {
+    const look = async (label) => {
+      await sleep(1500);
+      const now = await sp.api('/me/player').catch(() => null);
+      note(`${label}: ${now ? `${now.is_playing ? 'playing' : 'not playing'} "${now.item?.name}" at ${Math.round(now.progress_ms / 1000)}s on ${now.device?.name}, volume ${now.device?.volume_percent}` : 'nothing active'}`);
+      return now?.is_playing;
+    };
+    if (!(await look('now')) && this.device) {
       await sp.api('/me/player', { method: 'PUT', body: { device_ids: [this.device], play: true } });
       await sleep(1500);
       await send();
+      await look('after retry');
     }
     this.set({ paused: false, position: positionMs, duration: tracks[index].durationMs });
   },
