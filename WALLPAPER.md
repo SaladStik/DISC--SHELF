@@ -33,8 +33,11 @@ couple of requests per start.
 - **Now playing** comes from Windows media controls (Spotify desktop, browsers, …). A song that is in
   your library gets the full robot run; anything else goes straight into the jukebox with its cover.
   Both need audio recording and media integration left on in Wallpaper Engine's settings.
-- Between songs it skims the shelves by itself. Move the mouse over the desktop to take over: the
-  PLAYLISTS link (top left) and the shelf scrubber appear while it moves.
+- Left alone it walks the shelf you are on, case by case, and stays on it (also after a restart).
+  Move the mouse over the desktop to take over: the PLAYLISTS link (top left) and the shelf
+  scrubber appear while it moves.
+- **♪ DEVICE** (in that same bar, once signed in) lists your Spotify devices: pick where discs play.
+  Until you pick, it uses the active device, or failing that any open one.
 - Room, format, bass strength, volume, the now-playing card, mouse reaction and taskbar height are in
   the wallpaper's settings. The FPS limit in Wallpaper Engine is respected.
 

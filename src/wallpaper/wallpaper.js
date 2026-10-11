@@ -43,7 +43,8 @@ const norm = (s) => (s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').tri
 function find(title, artist) {
   const t = norm(title);
   const a = norm(artist.split(/[,;&]/)[0]);
-  for (const pl of lib.playlists) {
+  // inside a playlist only that playlist counts: nothing but a click leaves it
+  for (const pl of S.mode === 'tracks' ? [S.playlist] : lib.playlists) {
     const index = lib.tracks[pl.id].findIndex((x) => norm(x.name) === t && norm(x.artists).includes(a));
     if (index >= 0) return { pl, index };
   }
@@ -53,6 +54,7 @@ function find(title, artist) {
 let following = false; // the robot is fetching what the PC already plays: don't start it again
 const remote = {
   ready: Promise.resolve(),
+  device: localStorage.getItem('ds.device'), // picked with the DEVICE button
   state: { paused: true, position: 0, duration: 0, at: 0 },
   listeners: [],
   on(fn) {
@@ -71,7 +73,7 @@ const remote = {
     const send = () =>
       sp.api('/me/player/play', { method: 'PUT', query: { device_id: this.device }, body: { uris: tracks.map((t) => t.uri), offset: { position: index }, position_ms: positionMs } });
     await send().catch(async (e) => {
-      // an open but idle Spotify app isn't "active": find it and name it (remembered for next time)
+      // no device picked (or it's gone) and none active: an open but idle Spotify app will do
       if (e.status !== 404) throw e;
       const { devices } = await sp.api('/me/player/devices');
       this.device = (devices.find((d) => d.is_active) || devices[0])?.id;
@@ -141,6 +143,30 @@ function askToSignIn() {
   };
 }
 
+// ---------- choosing the Spotify device, from the bar that shows while the mouse moves ----------
+function devicePicker() {
+  const chip = document.querySelector('.top').appendChild(Object.assign(document.createElement('button'), { className: 'chip', textContent: '♪ DEVICE' }));
+  chip.onclick = async () => {
+    const { devices } = await sp.api('/me/player/devices').catch(() => ({ devices: [] }));
+    const menu = document.getElementById('ctx'); // the app's right-click menu, which a click elsewhere closes
+    menu.innerHTML = `<div class="ctx-title">${devices.length ? 'PLAY ON' : 'OPEN SPOTIFY FIRST'}</div>`;
+    for (const d of devices) {
+      const b = menu.appendChild(document.createElement('button'));
+      b.textContent = `${d.id === remote.device ? '▶ ' : ''}${d.name}`;
+      b.onclick = () => {
+        localStorage.setItem('ds.device', (remote.device = d.id));
+        sp.api('/me/player', { method: 'PUT', body: { device_ids: [d.id] } }).catch(() => {}); // move what's playing there
+        menu.hidden = true;
+      };
+    }
+    const r = chip.getBoundingClientRect();
+    menu.style.left = `${r.left}px`;
+    menu.style.top = `${r.bottom + 6}px`;
+    menu.hidden = false;
+    S.menuOpen = true;
+  };
+}
+
 // ---------- now playing, from Windows media controls ----------
 let next = null; // the song the PC just started, waiting for the robot
 function followMedia() {
@@ -165,7 +191,7 @@ async function present(track) {
   const hit = find(track.name, track.artists);
   if (hit) {
     following = true;
-    if (S.mode !== 'tracks' || S.playlist !== hit.pl) await app.openPlaylist(hit.pl);
+    if (S.mode !== 'tracks') await app.openPlaylist(hit.pl);
     await app.robotPlay(hit.index);
     S.queue.clearUpcoming(); // we don't know what the PC plays next
     clearTimeout(S.queue.syncTimer);
@@ -179,16 +205,13 @@ async function present(track) {
 }
 
 // ---------- autopilot ----------
-let i = 0;
-let left = 8; // cases to skim before changing shelves
+// Walks the shelf you are on, case by case, round and round. Changing shelves is yours to do.
+let i, walked;
 async function browse() {
   if (S.view !== 'shelf') app.setView('shelf');
-  if (left-- <= 0) {
-    left = 30 + Math.random() * 40;
-    if (S.mode === 'tracks') await app.showPlaylists(S.playlist.id);
-    else await app.openPlaylist(lib.playlists[Math.floor(Math.random() * lib.playlists.length)]);
-    i = Math.floor(Math.random() * shelf.items.length);
-  }
+  if (walked !== shelf.items) i = -1; // a new shelf starts at its first case
+  walked = shelf.items;
+  localStorage.setItem('ds.playlist', S.mode === 'tracks' ? S.playlist.id : ''); // to come back to after a restart
   i = (i + 1) % shelf.items.length;
   S.keyboard = true;
   S.kbIndex = i;
@@ -216,12 +239,15 @@ addEventListener('pointermove', () => {
       setTimeout(done, 8000, false);
     }));
   if (!local) followMedia();
+  if (signedIn && !local) devicePicker();
 
   app.bindPlayer(local ? sdk : remote);
   S.player.setVolume?.(volume);
   app.enter();
   app.onActivate = () => signedIn || S.mode === 'playlists'; // signed out, a click can only open a binder
   if (!signedIn && sp.getClientId()) askToSignIn();
+  const open = (id) => lib.playlists.find((p) => p.id === id);
+  if (open(localStorage.getItem('ds.playlist'))) await app.openPlaylist(open(localStorage.getItem('ds.playlist')));
 
   let checked = performance.now();
   for (;;) {
@@ -229,6 +255,9 @@ addEventListener('pointermove', () => {
     if (signedIn && performance.now() - checked > 15 * 60000) {
       checked = performance.now();
       await spotifyLibrary().then(use, () => {});
+      // the playlist on the shelf grew or shrank: put the new one up
+      const pl = S.mode === 'tracks' && open(S.playlist.id);
+      if (pl && lib.tracks[pl.id].length !== S.tracks.length) await app.openPlaylist(pl);
     }
     if (S.busy || document.body.classList.contains('hands')) await sleep(500);
     else if (next) {
