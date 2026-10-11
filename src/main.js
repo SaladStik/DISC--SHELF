@@ -834,8 +834,6 @@ $('btn-connect').onclick = async () => {
   if (new URLSearchParams(location.search).has('demo')) return startDemo();
   try {
     if (await sp.handleRedirect()) {
-      if (new URLSearchParams(location.search).has('wallpaper'))
-        return prompt('Paste this into the wallpaper’s “Spotify login code” setting. This browser is now logged out.', sp.handOffLogin());
       $('start').hidden = true;
       $('hud').hidden = false;
       await startSpotify();

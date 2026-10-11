@@ -31,6 +31,16 @@ body.hands .scrub-wrap {
   top: 52px;
   bottom: auto;
 }
+#signin {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  max-width: min(620px, 90vw);
+  white-space: normal;
+  line-height: 1.5;
+}
 .hover-card {
   bottom: calc(var(--taskbar) + 20px);
 }

@@ -20,7 +20,8 @@ const LS = {
   token: 'ds.token',
 };
 
-export const redirectUri = () => window.location.origin + '/';
+// The wallpaper has no address of its own: it borrows the dev server's, and the user carries the code back.
+export const redirectUri = () => (window.DS_WALLPAPER ? 'http://127.0.0.1:5173/' : window.location.origin + '/');
 
 function store(key, val) {
   try {
@@ -47,7 +48,7 @@ export function setClientId(id) {
 const b64url = (buf) =>
   btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-export async function login() {
+export async function loginUrl() {
   const clientId = getClientId();
   if (!clientId) throw new Error('Missing Spotify Client ID');
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(64)));
@@ -61,21 +62,15 @@ export async function login() {
     code_challenge: challenge,
     scope: SCOPES,
   });
-  window.location.href = `https://accounts.spotify.com/authorize?${params}`;
+  return `https://accounts.spotify.com/authorize?${params}`;
+}
+
+export async function login() {
+  window.location.href = await loginUrl();
 }
 
 export function logout() {
   store(LS.token, null);
-}
-
-/**
- * The login as a code for the Wallpaper Engine wallpaper's settings (see WALLPAPER.md). A refresh
- * token only keeps working in one place, so handing it over signs this browser out.
- */
-export function handOffLogin() {
-  const t = load(LS.token, true);
-  logout();
-  return `${t.cid || getClientId()}:${t.refresh}`;
 }
 
 async function tokenRequest(body) {
@@ -101,6 +96,10 @@ async function tokenRequest(body) {
   return token;
 }
 
+/** Trades the code Spotify redirected back with for a login. */
+export const finishLogin = (code) =>
+  tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: redirectUri(), code_verifier: load(LS.verifier) || '' });
+
 /** Completes the redirect if we just came back from Spotify. Returns true when a usable token exists. */
 export async function handleRedirect() {
   const url = new URL(window.location.href);
@@ -109,12 +108,7 @@ export async function handleRedirect() {
   if (code || err) {
     window.history.replaceState({}, '', url.pathname);
     if (err) throw new Error(`Spotify login cancelled: ${err}`);
-    await tokenRequest({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri(),
-      code_verifier: load(LS.verifier) || '',
-    });
+    await finishLogin(code);
   }
   const t = load(LS.token, true);
   // switched to a different Spotify app: the old login belongs to the old app, drop it

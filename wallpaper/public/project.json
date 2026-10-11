@@ -7,7 +7,8 @@
   "general": {
     "supportsaudioprocessing": true,
     "properties": {
-      "spotify": { "order": 0, "text": "Spotify login code", "type": "textinput", "value": "" },
+      "clientid": { "order": -2, "text": "Spotify Client ID", "type": "textinput", "value": "" },
+      "callback": { "order": -1, "text": "Spotify sign-in address", "type": "textinput", "value": "" },
       "room": {
         "order": 1,
         "text": "Room",

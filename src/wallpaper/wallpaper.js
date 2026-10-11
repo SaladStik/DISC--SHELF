@@ -1,7 +1,7 @@
 /**
  * DISC//SHELF as a Wallpaper Engine web wallpaper (see WALLPAPER.md).
  *
- * The bass comes from the PC's real audio. Signed in (the "Spotify login code" setting), it shows your
+ * The bass comes from the PC's real audio. Signed in (through its settings, see below), it shows your
  * library and a clicked disc plays: in the wallpaper itself if Wallpaper Engine's browser can run
  * Spotify's player, otherwise on your Spotify app. Signed out, it runs on a saved or demo library.
  * Whenever something else on the PC plays the music, the robot fetches each new song.
@@ -85,15 +85,21 @@ W.wallpaperRegisterAudioListener?.((bins) => Beat.feedSpectrum(bins));
 let volume = 0.6;
 W.wallpaperPropertyListener = {
   applyUserProperties(p) {
-    // a new login code ("clientId:refreshToken" from the website's /?wallpaper): take it and start over.
-    // From then on the wallpaper keeps its own refreshed token.
-    if (p.spotify && p.spotify.value !== (localStorage.getItem('ds.code') || '')) {
-      const [cid, refresh] = p.spotify.value.trim().split(':');
-      localStorage.setItem('ds.code', p.spotify.value);
-      localStorage.setItem('ds.clientId', cid);
-      if (refresh) localStorage.setItem('ds.token', JSON.stringify({ refresh, expires: 0, cid }));
-      else localStorage.removeItem('ds.token');
-      return location.reload();
+    // a new Client ID is a new login (clearing it signs out); the check after saving is for a browser
+    // that won't store anything, which would otherwise reload forever
+    if (p.clientid && p.clientid.value.trim() !== sp.getClientId()) {
+      sp.setClientId(p.clientid.value);
+      sp.logout();
+      if (sp.getClientId() === p.clientid.value.trim()) return location.reload();
+    }
+    // the address the browser ended on after approving carries the code that finishes the login
+    const code = p.callback?.value.match(/[?&]code=([^&]+)/)?.[1];
+    if (code && code !== localStorage.getItem('ds.code')) {
+      localStorage.setItem('ds.code', code);
+      sp.finishLogin(code).then(
+        () => location.reload(),
+        () => signIn && (signIn.textContent = 'Spotify didn’t take that address. Click here to try again.'),
+      );
     }
     if (p.room) app.setTheme(p.room.value);
     if (p.format) app.setMedia(p.format.value);
@@ -107,6 +113,21 @@ W.wallpaperPropertyListener = {
     if (p.fps) app.setFpsLimit(p.fps);
   },
 };
+
+// ---------- signing in ----------
+// Spotify signs you in on a web page, and a wallpaper gets no keyboard. So a click here opens that
+// page in the browser, and the address it ends on comes back through the wallpaper's settings.
+let signIn;
+function askToSignIn() {
+  signIn = document.body.appendChild(Object.assign(document.createElement('button'), { id: 'signin', className: 'btn primary', textContent: '▶ CLICK TO SIGN IN TO SPOTIFY' }));
+  signIn.onclick = async () => {
+    const url = await sp.loginUrl();
+    window.open(url);
+    navigator.clipboard?.writeText(url).catch(() => {}); // in case nothing opened
+    signIn.textContent =
+      'Approve in your browser (if none opened, the link is on your clipboard). The page after that won’t load: copy its address into “Spotify sign-in address” in this wallpaper’s settings.';
+  };
+}
 
 // ---------- now playing, from Windows media controls ----------
 let next = null; // the song the PC just started, waiting for the robot
@@ -188,6 +209,7 @@ addEventListener('pointermove', () => {
   S.player.setVolume?.(volume);
   app.enter();
   app.onActivate = () => signedIn || S.mode === 'playlists'; // signed out, a click can only open a binder
+  if (!signedIn && sp.getClientId()) askToSignIn();
 
   let checked = performance.now();
   for (;;) {
